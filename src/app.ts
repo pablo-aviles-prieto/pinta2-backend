@@ -15,12 +15,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-const server = http.createServer(app);
+const httpServer = http.createServer(app);
 
-const io = new Server(server);
+const io = new Server(httpServer, {
+  cors: {
+    origin: 'http://localhost:5173'
+  }
+});
 
 io.on('connection', (socket) => {
   console.log('a user connected');
+  socket.on('disconnect', () => {
+    console.log('user disconnected');
+  });
+  socket.on('chat msg', (msg: string) => {
+    io.emit('chat msg', msg);
+  });
 });
 
-server.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
+httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
