@@ -1,0 +1,56 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "prettier",
+    "plugin:prettier/recommended",
+    "plugin:jsdoc/recommended"
+  ],
+  "plugins": [
+    "eslint-plugin-import",
+    "eslint-plugin-prefer-arrow",
+    "eslint-plugin-jsdoc",
+    "@typescript-eslint",
+    "@typescript-eslint/tslint"
+  ],
+  "parserOptions": {
+    "project": ["./tsconfig.json"]
+  },
+  "rules": {
+    "quotes": ["error", "single", { "allowTemplateLiterals": true }],
+    "simple-import-sort/imports": "error",
+    "simple-import-sort/exports": "error",
+    // "prettier": 0,
+    "no-console": ["error", { "allow": ["warn", "error", "info", "log"] }],
+    "object-literal-sort-keys": 0,
+    "no-unused-expression": 0,
+    "@typescript-eslint/no-unsafe-assignment": 0,
+    "ordered-imports": 0,
+    "interface-name": 0,
+    "array-type": 0,
+    "@typescript-eslint/ban-types": 0,
+    "max-classes-per-file": 0,
+    "member-access": 0,
+    "arrow-parens": ["warn", "as-needed"],
+    "no-namespace": 0,
+    "only-arrow-functions": 0,
+    "no-var-requires": 0,
+    "curly": 0,
+    "variable-name": 0,
+    "@typescript-eslint/restrict-template-expressions": 0,
+    "@typescript-eslint/no-unsafe-member-access": 0,
+    "@typescript-eslint/no-unsafe-argument": 0,
+    "@typescript-eslint/no-misused-promises": 0,
+    "semi": 2,
+    "prefer-destructuring": 1,
+    "object-curly-spacing": ["error", "always"],
+    "no-multiple-empty-lines": [2, {"max": 2, "maxEOF": 1, "maxBOF": 0}],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { 
+        "argsIgnorePattern": "^_"
+      }
+    ]
+  }
+}

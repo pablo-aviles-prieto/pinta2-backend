@@ -1,0 +1,8 @@
+{
+  "restartable": "0",
+  "verbose": true,
+  "ignore": ["**/*.test.ts", "**/*.spec.ts", ".git", "node_modules"],
+  "exec": "babel-node --extensions \".ts\" src/app.ts",
+  "watch": ["src", "yarn.lock"],
+  "ext": "js,json,ts"
+}
