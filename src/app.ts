@@ -29,7 +29,15 @@ io.on('connection', (socket) => {
     console.log('user disconnected');
   });
   socket.on('chat msg', (msg: string) => {
+    // This will send the event to all connected clients, including the one that initiated the event.
     io.emit('chat msg', msg);
+  });
+  socket.on('new line segment', (lineSegment) => {
+    // This will send the event to all clients except for the one that initiated the event
+    socket.broadcast.emit('new line segment', lineSegment);
+  });
+  socket.on('clear board', () => {
+    socket.broadcast.emit('clear board');
   });
 });
 
