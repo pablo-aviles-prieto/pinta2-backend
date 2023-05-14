@@ -5,6 +5,7 @@ import cors from 'cors';
 import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
+import { LinesI } from './interfaces';
 
 const { PORT } = process.env;
 
@@ -32,9 +33,9 @@ io.on('connection', (socket) => {
     // This will send the event to all connected clients, including the one that initiated the event.
     io.emit('chat msg', msg);
   });
-  socket.on('new line segment', (lineSegment) => {
+  socket.on('new segment', (lineLength: number, lineSegment: LinesI) => {
     // This will send the event to all clients except for the one that initiated the event
-    socket.broadcast.emit('new line segment', lineSegment);
+    socket.broadcast.emit('new segment', lineLength, lineSegment);
   });
   socket.on('clear board', () => {
     socket.broadcast.emit('clear board');
