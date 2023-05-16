@@ -32,13 +32,13 @@ io.on('connection', (socket) => {
   socket.on('register', (username) => {
     usersAmount++;
     users[socket.id] = username;
-    console.log(`${username} connected // Total users => ${usersAmount}`);
+    console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
   socket.on('disconnect', () => {
     usersAmount--;
     const username = users[socket.id];
-    console.log(`${username} disconnected // Total users => ${usersAmount}`);
+    console.info(`${username} disconnected // Total users => ${usersAmount}`);
     delete users[socket.id];
   });
 
