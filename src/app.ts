@@ -44,21 +44,24 @@ io.on('connection', (socket) => {
     const username = users[socket.id].name;
     console.info(`${username} disconnected // Total users => ${usersAmount}`);
     delete users[socket.id];
+    // TODO: Remove the user from the room, and delete the room if there are no more users connected to it
   });
 
   socket.on('chat msg', ({ msg, roomNumber }: { msg: string; roomNumber: number }) => {
-    // This will send the event to all connected clients, including the one that initiated the event.
-    // io.emit('chat msg', { user: users[socket.id].name, msg });
+    // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
     io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
   });
 
-  socket.on('new segment', (lineLength: number, lineSegment: LinesI) => {
-    // This will send the event to all clients except for the one that initiated the event
-    socket.broadcast.emit('new segment', lineLength, lineSegment);
-  });
+  socket.on(
+    'new segment',
+    ({ lineLength, lineSegment, roomNumber }: { lineLength: number; lineSegment: LinesI; roomNumber: number }) => {
+      // This will send the event to all clients in the specified room, except for the one that initiated the event.
+      socket.broadcast.to(roomNumber.toString()).emit('new segment', lineLength, lineSegment);
+    }
+  );
 
-  socket.on('clear board', () => {
-    socket.broadcast.emit('clear board');
+  socket.on('clear board', ({ roomNumber }: { roomNumber: number }) => {
+    socket.broadcast.to(roomNumber.toString()).emit('clear board');
   });
 
   socket.on('create room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
@@ -72,21 +75,35 @@ io.on('connection', (socket) => {
         password: roomPassword,
         users: [{ id: socket.id, name: users[socket.id].name, score: 0, isDrawing: false }]
       };
+      users[socket.id].room = roomNumber;
       socket.emit('create room response', { success: true, message: 'Room successfully created', room: roomNumber });
       console.dir(rooms, { depth: null });
     }
   });
 
-  socket.on('join room', ({ roomNumber }) => {
+  socket.on('join room', ({ roomNumber, roomPassword }) => {
     if (!rooms[roomNumber]) {
-      socket.emit('join room response', { success: false, message: 'Room does not exist' });
+      socket.emit('join room response', { success: false, message: 'Room does not exist', room: roomNumber });
     } else {
+      const passwordMatches = rooms[roomNumber].password === roomPassword;
+
+      if (!passwordMatches) {
+        socket.emit('join room response', {
+          success: false,
+          message: `Check the provided credentials`,
+          room: roomNumber
+        });
+        return;
+      }
+
       // join the socket to the room
       socket.join(roomNumber.toString());
 
       const username = users[socket.id].name;
       // add the user to the room's users array
       rooms[roomNumber].users.push({ id: socket.id, name: username, score: 0, isDrawing: false });
+      // add the roomNumber to the room prop in users obj
+      users[socket.id].room = roomNumber;
 
       // notify all sockets in the room that a new user has joined
       io.to(roomNumber.toString()).emit('user joined', { username });
