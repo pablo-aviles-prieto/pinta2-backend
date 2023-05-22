@@ -46,9 +46,10 @@ io.on('connection', (socket) => {
     delete users[socket.id];
   });
 
-  socket.on('chat msg', (msg: string) => {
+  socket.on('chat msg', ({ msg, roomNumber }: { msg: string; roomNumber: number }) => {
     // This will send the event to all connected clients, including the one that initiated the event.
-    io.emit('chat msg', { user: users[socket.id].name, msg });
+    // io.emit('chat msg', { user: users[socket.id].name, msg });
+    io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
   });
 
   socket.on('new segment', (lineLength: number, lineSegment: LinesI) => {
@@ -60,16 +61,39 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('clear board');
   });
 
-  socket.on('create room', ({ roomNumber, roomPassword }) => {
+  socket.on('create room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (rooms[roomNumber]) {
-      socket.emit('create room response', { success: false, message: 'Room already exists' });
+      socket.emit('create room response', { success: false, message: 'Room already exists', room: roomNumber });
       console.log('Room already exists');
     } else {
+      socket.join(roomNumber.toString());
       rooms[roomNumber] = {
+        owner: socket.id,
         password: roomPassword,
-        users: [{ id: socket.id, name: users[socket.id].name }]
+        users: [{ id: socket.id, name: users[socket.id].name, score: 0, isDrawing: false }]
       };
-      socket.emit('create room response', { success: true, message: 'Room successfully created' });
+      socket.emit('create room response', { success: true, message: 'Room successfully created', room: roomNumber });
+      console.dir(rooms, { depth: null });
+    }
+  });
+
+  socket.on('join room', ({ roomNumber }) => {
+    if (!rooms[roomNumber]) {
+      socket.emit('join room response', { success: false, message: 'Room does not exist' });
+    } else {
+      // join the socket to the room
+      socket.join(roomNumber.toString());
+
+      const username = users[socket.id].name;
+      // add the user to the room's users array
+      rooms[roomNumber].users.push({ id: socket.id, name: username, score: 0, isDrawing: false });
+
+      // notify all sockets in the room that a new user has joined
+      io.to(roomNumber.toString()).emit('user joined', { username });
+
+      // respond to the joining socket with success
+      socket.emit('join room response', { success: true, message: 'Successfully joined room', room: roomNumber });
+
       console.dir(rooms, { depth: null });
     }
   });
