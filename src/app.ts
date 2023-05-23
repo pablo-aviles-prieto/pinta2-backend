@@ -42,9 +42,33 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     usersAmount--;
     const username = users[socket.id].name;
-    console.info(`${username} disconnected // Total users => ${usersAmount}`);
+    const roomNumber = users[socket.id]?.room;
+
+    if (roomNumber) {
+      // Find the index of the user in the room's users array
+      const userIndex = rooms[roomNumber].users.findIndex((user) => user.id === socket.id);
+      if (userIndex !== -1) {
+        // Remove the user from the room's users array
+        rooms[roomNumber].users.splice(userIndex, 1);
+      }
+
+      // Check if the user disconnecting is the owner
+      if (rooms[roomNumber]?.owner === socket.id) {
+        // If there are still users in the room, pass ownership to the next user
+        if (rooms[roomNumber].users.length > 0) {
+          rooms[roomNumber].owner = rooms[roomNumber].users[0].id;
+        }
+      }
+
+      // If there are no more users in the room, delete the room
+      if (rooms[roomNumber].users.length === 0) {
+        delete rooms[roomNumber];
+        console.info(`Last user (${username}) left the room ${roomNumber}, deleted room!`);
+      }
+    }
+
     delete users[socket.id];
-    // TODO: Remove the user from the room, and delete the room if there are no more users connected to it
+    console.info(`${username} disconnected // Total users => ${usersAmount}`);
   });
 
   socket.on('chat msg', ({ msg, roomNumber }: { msg: string; roomNumber: number }) => {
