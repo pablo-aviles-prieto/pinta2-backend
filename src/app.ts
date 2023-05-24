@@ -1,5 +1,6 @@
 import 'dotenv/config';
 
+import words from './assets/words.json';
 import http from 'http';
 import cors from 'cors';
 import express from 'express';
@@ -32,6 +33,9 @@ const rooms: { [key: string]: RoomsI } = {};
 // socket.emit => sends a message to the socket connection (client) that we're currently dealing with
 // io.emit => sends a message to all connected sockets (clients)
 // socket.broadcast.emit => sends a message to all connected sockets (clients), except for the one that we're currently dealing with
+// ROOMS:
+// socket.to(room).emit sends a message to all clients in the specified room except for the client on which socket is called (except to the user that init the event).
+// io.to(room).emit sends a message to all clients in the specified room.
 io.on('connection', (socket) => {
   socket.on('register', (username) => {
     usersAmount++;
@@ -136,13 +140,19 @@ io.on('connection', (socket) => {
 
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
       const roomOwner = selectedRoom.owner;
-      socket.to(roomOwner).emit('start game', { numberOfUsers: selectedRoom.users.length });
+      const categories = Object.keys(words);
+      socket.to(roomOwner).emit('pre game', { categories });
+      io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
     }
 
     // respond to the joining socket with success
     socket.emit('join room response', { success: true, message: 'Successfully joined room', room: roomNumber });
 
     console.dir(rooms, { depth: null });
+  });
+
+  socket.on('set room category', ({ category, roomNumber }: { category: string; roomNumber: number }) => {
+    rooms[roomNumber].gameState.category = category;
   });
 });
 

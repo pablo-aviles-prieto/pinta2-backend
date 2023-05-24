@@ -1,5 +1,6 @@
 interface GameStateI {
   started: boolean;
+  category?: string;
   currentWord?: string | undefined;
   drawer?: string | undefined;
   round?: number; // the current round number (initialize in 1)

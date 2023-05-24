@@ -129,8 +129,8 @@
     "Servidor",
     "Memoria",
     "Procesador",
-    "DiscoDuro",
-    "TarjetaGrafica",
+    "Disco duro",
+    "Tarjeta grafica",
     "Router",
     "Modem",
     "Pendrive",
@@ -138,7 +138,7 @@
     "Tecla",
     "Codigo",
     "Programa",
-    "BaseDatos",
+    "Bases de datos",
     "Red",
     "Antivirus",
     "Pixel",
@@ -154,7 +154,7 @@
     "Enfoque",
     "Zoom"
   ],
-  "Random": [
+  "Aleatorio": [
     "Casa",
     "Perro",
     "Gato",
