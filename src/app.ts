@@ -52,12 +52,10 @@ io.on('connection', (socket) => {
         rooms[roomNumber].users.splice(userIndex, 1);
       }
 
-      // Check if the user disconnecting is the owner
-      if (rooms[roomNumber]?.owner === socket.id) {
-        // If there are still users in the room, pass ownership to the next user
-        if (rooms[roomNumber].users.length > 0) {
-          rooms[roomNumber].owner = rooms[roomNumber].users[0].id;
-        }
+      // Check if the user disconnecting is the owner and if there is more users in the room
+      // it pass the ownership to the next user
+      if (rooms[roomNumber].owner === socket.id && rooms[roomNumber].users.length > 0) {
+        rooms[roomNumber].owner = rooms[roomNumber].users[0].id;
       }
 
       // If there are no more users in the room, delete the room
@@ -97,7 +95,8 @@ io.on('connection', (socket) => {
       rooms[roomNumber] = {
         owner: socket.id,
         password: roomPassword,
-        users: [{ id: socket.id, name: users[socket.id].name, score: 0, isDrawing: false }]
+        users: [{ id: socket.id, name: users[socket.id].name }],
+        gameState: { started: false }
       };
       users[socket.id].room = roomNumber;
       socket.emit('create room response', { success: true, message: 'Room successfully created', room: roomNumber });
@@ -105,38 +104,45 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join room', ({ roomNumber, roomPassword }) => {
+  socket.on('join room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (!rooms[roomNumber]) {
       socket.emit('join room response', { success: false, message: 'Room does not exist', room: roomNumber });
-    } else {
-      const passwordMatches = rooms[roomNumber].password === roomPassword;
-
-      if (!passwordMatches) {
-        socket.emit('join room response', {
-          success: false,
-          message: `Check the provided credentials`,
-          room: roomNumber
-        });
-        return;
-      }
-
-      // join the socket to the room
-      socket.join(roomNumber.toString());
-
-      const username = users[socket.id].name;
-      // add the user to the room's users array
-      rooms[roomNumber].users.push({ id: socket.id, name: username, score: 0, isDrawing: false });
-      // add the roomNumber to the room prop in users obj
-      users[socket.id].room = roomNumber;
-
-      // notify all sockets in the room that a new user has joined
-      io.to(roomNumber.toString()).emit('user joined', { username });
-
-      // respond to the joining socket with success
-      socket.emit('join room response', { success: true, message: 'Successfully joined room', room: roomNumber });
-
-      console.dir(rooms, { depth: null });
+      return;
     }
+
+    const selectedRoom = rooms[roomNumber];
+    const passwordMatches = selectedRoom.password === roomPassword;
+
+    if (!passwordMatches) {
+      socket.emit('join room response', {
+        success: false,
+        message: `Check the provided credentials`,
+        room: roomNumber
+      });
+      return;
+    }
+
+    // join the socket to the room
+    socket.join(roomNumber.toString());
+
+    const username = users[socket.id].name;
+    // add the user to the room's users array
+    selectedRoom.users.push({ id: socket.id, name: username });
+    // add the roomNumber to the room prop in users obj
+    users[socket.id].room = roomNumber;
+
+    // notify all sockets in the room that a new user has joined
+    io.to(roomNumber.toString()).emit('user joined', { username });
+
+    if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
+      const roomOwner = selectedRoom.owner;
+      socket.to(roomOwner).emit('start game', { numberOfUsers: selectedRoom.users.length });
+    }
+
+    // respond to the joining socket with success
+    socket.emit('join room response', { success: true, message: 'Successfully joined room', room: roomNumber });
+
+    console.dir(rooms, { depth: null });
   });
 });
 

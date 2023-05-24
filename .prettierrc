@@ -7,6 +7,5 @@
   "bracketSpacing": true,
   "bracketSameLine": true,
   "trailingComma": "none",
-  "arrowParens": "always",
-  "parser": "typescript"
+  "arrowParens": "always"
 }
