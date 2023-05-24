@@ -49,23 +49,27 @@ io.on('connection', (socket) => {
     const roomNumber = users[socket.id]?.room;
 
     if (roomNumber) {
+      const selectedRoom = rooms[roomNumber];
       // Find the index of the user in the room's users array
-      const userIndex = rooms[roomNumber].users.findIndex((user) => user.id === socket.id);
+      const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
       if (userIndex !== -1) {
         // Remove the user from the room's users array
-        rooms[roomNumber].users.splice(userIndex, 1);
+        selectedRoom.users.splice(userIndex, 1);
       }
 
       // Check if the user disconnecting is the owner and if there is more users in the room
       // it pass the ownership to the next user
-      if (rooms[roomNumber].owner === socket.id && rooms[roomNumber].users.length > 0) {
-        rooms[roomNumber].owner = rooms[roomNumber].users[0].id;
+      if (selectedRoom.owner === socket.id && selectedRoom.users.length > 0) {
+        selectedRoom.owner = selectedRoom.users[0].id;
       }
 
       // If there are no more users in the room, delete the room
-      if (rooms[roomNumber].users.length === 0) {
+      if (selectedRoom.users.length === 0) {
         delete rooms[roomNumber];
         console.info(`Last user (${username}) left the room ${roomNumber}, deleted room!`);
+      } else {
+        // In case there are more users, update the userList to them
+        io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
       }
     }
 
@@ -164,6 +168,12 @@ io.on('connection', (socket) => {
 
   socket.on('set room category', ({ category, roomNumber }: { category: string; roomNumber: number }) => {
     rooms[roomNumber].gameState.category = category;
+  });
+
+  socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
+    io.to(roomNumber.toString()).emit('await more players response', {
+      message: 'The leader is awaiting for more players...'
+    });
   });
 });
 
