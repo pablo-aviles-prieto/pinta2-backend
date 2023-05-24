@@ -6,7 +6,8 @@ import cors from 'cors';
 import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
-import { LinesI, RoomsI, UsersI } from './interfaces';
+import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
+import { getRandomWord, checkIfUsedWord, getUnusedWord } from './utils';
 
 const { PORT } = process.env;
 
@@ -174,6 +175,35 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('await more players response', {
       message: 'The leader is awaiting for more players...'
     });
+  });
+
+  socket.on('init game', ({ roomNumber }: { roomNumber: number }) => {
+    const selectedRoom = rooms[roomNumber];
+    const selectedCategory = selectedRoom.gameState.category || 'Aleatorio';
+    const randomWord = getUnusedWord({
+      availableWords: words[selectedCategory as keyof typeof words],
+      usedWords: selectedRoom.gameState.previousWords ?? []
+    });
+
+    const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
+      acc[user.id] = { name: user.name, value: 0 };
+      return acc;
+    }, {});
+
+    // TODO: Set a better way to shuffle the users in a room to pick the drawers.
+    // TODO: maybe shuffle the words in the array and forget about getUnusedWord recursive function.
+    const gameState: GameStateI = {
+      ...selectedRoom.gameState,
+      started: true,
+      currentWord: randomWord, // TODO: Send only to the drawer id
+      drawer: selectedRoom.users[0],
+      round: 1,
+      turn: 0,
+      previousWords: [randomWord],
+      scores: scores
+    };
+
+    io.to(roomNumber.toString()).emit('game initialized', { gameState });
   });
 });
 
