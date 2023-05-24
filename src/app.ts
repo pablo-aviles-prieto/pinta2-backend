@@ -96,14 +96,20 @@ io.on('connection', (socket) => {
       console.log('Room already exists');
     } else {
       socket.join(roomNumber.toString());
+      const roomUsers = [{ id: socket.id, name: users[socket.id].name }];
       rooms[roomNumber] = {
         owner: socket.id,
         password: roomPassword,
-        users: [{ id: socket.id, name: users[socket.id].name }],
+        users: roomUsers,
         gameState: { started: false }
       };
       users[socket.id].room = roomNumber;
-      socket.emit('create room response', { success: true, message: 'Room successfully created', room: roomNumber });
+      socket.emit('create room response', {
+        success: true,
+        message: 'Room successfully created',
+        room: roomNumber,
+        roomUsers
+      });
       console.dir(rooms, { depth: null });
     }
   });
@@ -142,11 +148,16 @@ io.on('connection', (socket) => {
       const roomOwner = selectedRoom.owner;
       const categories = Object.keys(words);
       socket.to(roomOwner).emit('pre game', { categories });
-      io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
     }
 
+    io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
     // respond to the joining socket with success
-    socket.emit('join room response', { success: true, message: 'Successfully joined room', room: roomNumber });
+    socket.emit('join room response', {
+      success: true,
+      message: 'Successfully joined room',
+      room: roomNumber,
+      newUsers: selectedRoom.users // Sending the updated userList to the user just joined the room
+    });
 
     console.dir(rooms, { depth: null });
   });
