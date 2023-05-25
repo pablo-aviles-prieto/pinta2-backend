@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { getRandomWord, checkIfUsedWord, getUnusedWord } from './utils';
+import { getUnusedWord } from './utils';
 
 const { PORT } = process.env;
 
@@ -195,16 +195,31 @@ io.on('connection', (socket) => {
     const gameState: GameStateI = {
       ...selectedRoom.gameState,
       started: true,
-      currentWord: randomWord, // TODO: Send only to the drawer id
+      currentWord: randomWord, // TODO: Send only to the drawer id!! (maybe use specific events)
       drawer: selectedRoom.users[0],
       round: 1,
       turn: 0,
+      preTurn: true,
       previousWords: [randomWord],
       scores: scores
     };
 
+    // TODO: Send, before this event emit, 3 words so the drawer can choice which one
+    // send something like 'pre round start' before every round to the drawer
     io.to(roomNumber.toString()).emit('game initialized', { gameState });
+
+    const drawerId = selectedRoom.users[0].id;
+    selectedRoom.users.forEach((user) => {
+      if (user.id !== drawerId) {
+        io.to(user.id).emit('pre turn no drawer', { message: 'Waiting for the drawer to chose a word' });
+      }
+    });
+    io.to(drawerId).emit('pre turn drawer', { possibleWords: [randomWord, 'apple', 'test'] });
   });
+  // TODO: Hay que recibir el pre turn drawer response para saber que palabra escogio y luego enviar un evento
+  // del estilo countdown turn start, de 4 segundos antes de iniciar el juego
+  // TODO: Es necesario enviar la palabra seleccionada al drawer y al resto la palabra encriptada con *
+  // esos asteriscos habrá que cambiarlos por barrabajas _
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));

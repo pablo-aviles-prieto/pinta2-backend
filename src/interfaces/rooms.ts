@@ -10,10 +10,11 @@ export interface GameStateI {
   drawer?: UserI;
   round?: number; // the current round number (initialize in 1)
   turn?: number; // the current drawing turn (initialize in 0)
+  preTurn?: boolean;
   previousWords?: string[];
   scores?: {
     // storing as key the socket.id of the users
-    [key: string]: number;
+    [key: string]: {name: string, value: number};
   };
 }
 
