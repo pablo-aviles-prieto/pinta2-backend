@@ -7,7 +7,8 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { getUnusedWord } from './utils';
+import { shuffleArray } from './utils';
+import { DEFAULT_TURN_DURATION } from './utils/const';
 
 const { PORT } = process.env;
 
@@ -152,7 +153,8 @@ io.on('connection', (socket) => {
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
       const roomOwner = selectedRoom.owner;
       const categories = Object.keys(words);
-      socket.to(roomOwner).emit('pre game', { categories });
+      const possibleTurnDurations = { min: 60000, default: DEFAULT_TURN_DURATION, max: 180000 };
+      socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
     }
 
     io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
@@ -171,6 +173,10 @@ io.on('connection', (socket) => {
     rooms[roomNumber].gameState.category = category;
   });
 
+  socket.on('set turn duration', ({ turnDuration, roomNumber }: { turnDuration: number; roomNumber: number }) => {
+    rooms[roomNumber].gameState.turnDuration = turnDuration;
+  });
+
   socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
     io.to(roomNumber.toString()).emit('await more players response', {
       message: 'The leader is awaiting for more players...'
@@ -180,10 +186,7 @@ io.on('connection', (socket) => {
   socket.on('init game', ({ roomNumber }: { roomNumber: number }) => {
     const selectedRoom = rooms[roomNumber];
     const selectedCategory = selectedRoom.gameState.category || 'Aleatorio';
-    const randomWord = getUnusedWord({
-      availableWords: words[selectedCategory as keyof typeof words],
-      usedWords: selectedRoom.gameState.previousWords ?? []
-    });
+    const shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
 
     const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
       acc[user.id] = { name: user.name, value: 0 };
@@ -192,21 +195,23 @@ io.on('connection', (socket) => {
 
     // TODO: Set a better way to shuffle the users in a room to pick the drawers.
     // TODO: maybe shuffle the words in the array and forget about getUnusedWord recursive function.
-    const gameState: GameStateI = {
+    const initialGameState: GameStateI = {
       ...selectedRoom.gameState,
       started: true,
-      currentWord: randomWord, // TODO: Send only to the drawer id!! (maybe use specific events)
+      // currentWord: randomWord, // TODO: Send only to the drawer id!! (maybe use specific events)
+      words: shuffledArray,
+      previousWords: 3,
       drawer: selectedRoom.users[0],
       round: 1,
       turn: 0,
       preTurn: true,
-      previousWords: [randomWord],
+      turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
       scores: scores
     };
 
     // TODO: Send, before this event emit, 3 words so the drawer can choice which one
     // send something like 'pre round start' before every round to the drawer
-    io.to(roomNumber.toString()).emit('game initialized', { gameState });
+    io.to(roomNumber.toString()).emit('game initialized', { gameState: initialGameState });
 
     const drawerId = selectedRoom.users[0].id;
     selectedRoom.users.forEach((user) => {
@@ -214,12 +219,13 @@ io.on('connection', (socket) => {
         io.to(user.id).emit('pre turn no drawer', { message: 'Waiting for the drawer to chose a word' });
       }
     });
-    io.to(drawerId).emit('pre turn drawer', { possibleWords: [randomWord, 'apple', 'test'] });
+    const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
+    io.to(drawerId).emit('pre turn drawer', { possibleWords });
   });
   // TODO: Hay que recibir el pre turn drawer response para saber que palabra escogio y luego enviar un evento
   // del estilo countdown turn start, de 4 segundos antes de iniciar el juego
   // TODO: Es necesario enviar la palabra seleccionada al drawer y al resto la palabra encriptada con *
-  // esos asteriscos habrá que cambiarlos por barrabajas _
+  // esos asteriscos habrá que cambiarlos por barrabajas "_"
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
