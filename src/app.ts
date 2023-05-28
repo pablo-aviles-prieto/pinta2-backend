@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { shuffleArray } from './utils';
+import { obscureString, shuffleArray } from './utils';
 import { DEFAULT_TURN_DURATION } from './utils/const';
 
 const { PORT } = process.env;
@@ -194,23 +194,17 @@ io.on('connection', (socket) => {
     }, {});
 
     // TODO: Set a better way to shuffle the users in a room to pick the drawers.
-    // TODO: maybe shuffle the words in the array and forget about getUnusedWord recursive function.
     const initialGameState: GameStateI = {
       ...selectedRoom.gameState,
       started: true,
-      // currentWord: randomWord, // TODO: Send only to the drawer id!! (maybe use specific events)
       words: shuffledArray,
-      previousWords: 3,
       drawer: selectedRoom.users[0],
-      round: 1,
-      turn: 0,
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
       scores: scores
     };
+    selectedRoom.gameState = initialGameState;
 
-    // TODO: Send, before this event emit, 3 words so the drawer can choice which one
-    // send something like 'pre round start' before every round to the drawer
     io.to(roomNumber.toString()).emit('game initialized', { gameState: initialGameState });
 
     const drawerId = selectedRoom.users[0].id;
@@ -220,12 +214,48 @@ io.on('connection', (socket) => {
       }
     });
     const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
-    io.to(drawerId).emit('pre turn drawer', { possibleWords });
+    io.to(drawerId).emit('pre turn drawer', { possibleWords, prevTurn: undefined });
   });
-  // TODO: Hay que recibir el pre turn drawer response para saber que palabra escogio y luego enviar un evento
-  // del estilo countdown turn start, de 4 segundos antes de iniciar el juego
-  // TODO: Es necesario enviar la palabra seleccionada al drawer y al resto la palabra encriptada con *
-  // esos asteriscos habrá que cambiarlos por barrabajas "_"
+
+  socket.on(
+    'set drawer word',
+    ({
+      roomNumber,
+      word,
+      round,
+      turn,
+      previousWords
+    }: {
+      roomNumber: number;
+      word: string;
+      round: number;
+      turn: number;
+      previousWords: number;
+    }) => {
+      const selectedRoom = rooms[roomNumber];
+      const newGameState: GameStateI = {
+        ...selectedRoom.gameState,
+        currentWord: word,
+        previousWords,
+        round,
+        turn,
+        preTurn: false
+      };
+      const cryptedWord = obscureString(word);
+
+      selectedRoom.gameState = newGameState;
+
+      socket.broadcast.to(roomNumber.toString()).emit('update game state', {
+        gameState: { ...newGameState, currentWord: cryptedWord }
+      });
+
+      // init countdown on front
+      io.to(roomNumber.toString()).emit('countdown turn start');
+    }
+  );
+
+  // When someone joins in the middle of a game. The crypted word should be retrieved from a 
+  // no drawer user, in case there are some visible letters, so everybody has the same letters
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
