@@ -159,6 +159,9 @@ io.on('connection', (socket) => {
 
     io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
     // respond to the joining socket with success
+    // TODO: send the gameState to the joined user from a no drawer
+    // TODO: send what has been drawed until now
+    // the joined user, in case that is not a preTurn, he shouldnt be able to draw and chat
     socket.emit('join room response', {
       success: true,
       message: 'Successfully joined room',
@@ -249,12 +252,17 @@ io.on('connection', (socket) => {
         gameState: { ...newGameState, currentWord: cryptedWord }
       });
 
-      // init countdown on front
-      io.to(roomNumber.toString()).emit('countdown turn start');
+      // init preTurn countdown on front
+      io.to(roomNumber.toString()).emit('countdown preDraw start');
     }
   );
 
-  // When someone joins in the middle of a game. The crypted word should be retrieved from a 
+  socket.on('starting turn', ({ roomNumber }: { roomNumber: number }) => {
+    // init turn countdown on front
+    io.to(roomNumber.toString()).emit('countdown turn');
+  });
+
+  // When someone joins in the middle of a game. The crypted word should be retrieved from a
   // no drawer user, in case there are some visible letters, so everybody has the same letters
 });
 
