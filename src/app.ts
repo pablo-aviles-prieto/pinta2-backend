@@ -79,10 +79,23 @@ io.on('connection', (socket) => {
     console.info(`${username} disconnected // Total users => ${usersAmount}`);
   });
 
-  socket.on('chat msg', ({ msg, roomNumber }: { msg: string; roomNumber: number }) => {
-    // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
-    io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
-  });
+  socket.on(
+    'chat msg',
+    ({ msg, roomNumber, turnCount }: { msg: string; roomNumber: number; turnCount: number | undefined }) => {
+      const roomGameState = rooms[roomNumber].gameState;
+      if (turnCount && roomGameState.started && !roomGameState.preTurn && roomGameState.currentWord) {
+        console.log(
+          `word: ${msg} sent at ${turnCount}s / Current word: ${roomGameState.currentWord} => Message sent by: ${
+            users[socket.id].name
+          } with ID: ${socket.id}`
+        );
+        // TODO: Check if the message is the word that is being played at that turn in that roomNumber
+        // if it matches the word, DONT SEND IT SINCE IT CANT BE DISPLAYED
+      }
+      // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
+      io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
+    }
+  );
 
   socket.on(
     'new segment',
