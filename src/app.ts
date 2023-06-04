@@ -178,6 +178,8 @@ io.on('connection', (socket) => {
 
   socket.on('set turn duration', ({ turnDuration, roomNumber }: { turnDuration: number; roomNumber: number }) => {
     rooms[roomNumber].gameState.turnDuration = turnDuration;
+    // Sending the turnDuration to all the users except the leader (since it already knows)
+    socket.to(roomNumber.toString()).emit('set new turn duration', { turnDuration });
   });
 
   socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
