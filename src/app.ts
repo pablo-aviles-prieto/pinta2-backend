@@ -29,8 +29,8 @@ const io = new Server(httpServer, {
 
 let usersAmount = 0;
 // Save an array of users with the socket.id, username and assigned color for chat?
-const users: { [key: string]: UsersI } = {};
-const rooms: { [key: string]: RoomsI } = {};
+const users: { [key: string]: UsersI } = {}; // stored the socket.id as key
+const rooms: { [key: string]: RoomsI } = {}; // stored the roomNumber as key
 
 // socket.emit => sends a message to the socket connection (client) that we're currently dealing with
 // io.emit => sends a message to all connected sockets (clients)
@@ -83,14 +83,26 @@ io.on('connection', (socket) => {
     'chat msg',
     ({ msg, roomNumber, turnCount }: { msg: string; roomNumber: number; turnCount: number | undefined }) => {
       const roomGameState = rooms[roomNumber].gameState;
+
       if (turnCount && roomGameState.started && !roomGameState.preTurn && roomGameState.currentWord) {
-        console.log(
-          `word: ${msg} sent at ${turnCount}s / Current word: ${roomGameState.currentWord} => Message sent by: ${
-            users[socket.id].name
-          } with ID: ${socket.id}`
-        );
-        // TODO: Check if the message is the word that is being played at that turn in that roomNumber
-        // if it matches the word, DONT SEND IT SINCE IT CANT BE DISPLAYED
+        // If the msg is from the drawer while in his turn, return without sending
+        if (roomGameState.drawer?.id === socket.id) {
+          return;
+        }
+
+        if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
+          // Send and update the totalScores and turnScores in the game
+          // Check if its first guesser and in which second is sent the guessed word
+
+          // Sending the updated scores
+          io.to(roomNumber.toString()).emit('guessed word', {
+            id: socket.id,
+            msg: `El usuario ${users[socket.id].name} acertó la palabra`,
+            totalScores: {},
+            turnScores: {}
+          });
+          return;
+        }
       }
       // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
       io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
@@ -219,7 +231,8 @@ io.on('connection', (socket) => {
       drawer: selectedRoom.users[0],
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
-      scores: scores
+      totalScores: scores,
+      turnScores: {}
     };
     selectedRoom.gameState = initialGameState;
 
@@ -251,20 +264,21 @@ io.on('connection', (socket) => {
       previousWords: number;
     }) => {
       const selectedRoom = rooms[roomNumber];
+      const cryptedWord = obscureString(word);
       const newGameState: GameStateI = {
         ...selectedRoom.gameState,
         currentWord: word,
+        cryptedWord,
         previousWords,
         round,
         turn,
         preTurn: false
       };
-      const cryptedWord = obscureString(word);
 
       selectedRoom.gameState = newGameState;
 
-      socket.broadcast.to(roomNumber.toString()).emit('update game state', {
-        gameState: { ...newGameState, currentWord: cryptedWord }
+      io.to(roomNumber.toString()).emit('update game state', {
+        gameState: newGameState
       });
 
       // init preTurn countdown on front
@@ -277,8 +291,7 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('countdown turn');
   });
 
-  // When someone joins in the middle of a game. The crypted word should be retrieved from a
-  // no drawer user, in case there are some visible letters, so everybody has the same letters
+  // When someone joins in the middle of a game. The crypted word should be sent
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
