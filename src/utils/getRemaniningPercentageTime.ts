@@ -5,5 +5,6 @@ export const getRemaniningPercentageTime = ({
   remainingTime: number;
   totalTime: number;
 }) => {
-  return (remainingTime * 100) / totalTime;
+  const result = (remainingTime * 100) / totalTime;
+  return parseFloat(result.toFixed(2));
 };

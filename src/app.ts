@@ -91,8 +91,8 @@ io.on('connection', (socket) => {
         }
 
         if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
-          // Send and update the totalScores and turnScores in the game
-          // Check if its first guesser and in which second is sent the guessed word
+          // Send and update the totalScores and turnScores in the game!
+          // Check if its first guesser and in which second is sent the guessed word!
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
