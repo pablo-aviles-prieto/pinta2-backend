@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
 import { obscureString, shuffleArray } from './utils';
 import { DEFAULT_TURN_DURATION } from './utils/const';
+import { updateScoreAndTime } from './utils/updateScoreAndTime';
 
 const { PORT } = process.env;
 
@@ -91,8 +92,12 @@ io.on('connection', (socket) => {
         }
 
         if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
-          // Send and update the totalScores and turnScores in the game!
-          // Check if its first guesser and in which second is sent the guessed word!
+          const isFirstGuesser = Object.keys(roomGameState.turnScores ?? {}).length === 0;
+          const updatedScoreTime = updateScoreAndTime({
+            remainingTime: turnCount,
+            totalTime: roomGameState.turnDuration ? roomGameState.turnDuration / 100 : 120,
+            firstGuesser: isFirstGuesser
+          });
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
