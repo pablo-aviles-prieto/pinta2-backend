@@ -91,21 +91,72 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // User guessed the word
         if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
-          const isFirstGuesser = Object.keys(roomGameState.turnScores ?? {}).length === 0;
+          const turnScoresObj = roomGameState.turnScores;
+          const totalScoresObj = roomGameState.totalScores;
+          const isFirstGuesser = Object.keys(turnScoresObj ?? {}).length === 0;
           const updatedScoreTime = updateScoreAndTime({
             remainingTime: turnCount,
-            totalTime: roomGameState.turnDuration ? roomGameState.turnDuration / 100 : 120,
+            totalTime: roomGameState.turnDuration ? roomGameState.turnDuration / 1000 : 120,
             firstGuesser: isFirstGuesser
           });
+
+          // TODO: Send to the guesser a notify to display in the front
+
+          // Checks if the user already guessed (in case front dont handle it correctly)
+          if (turnScoresObj && turnScoresObj[socket.id]) {
+            return;
+          }
+
+          // creating the totalScoresObj if didnt exist
+          if (!totalScoresObj) {
+            roomGameState.totalScores = {};
+          }
+          // updating totalScoresObj, in case that the user already scored
+          if (totalScoresObj && totalScoresObj[socket.id]) {
+            totalScoresObj[socket.id] = {
+              ...totalScoresObj[socket.id],
+              value: totalScoresObj[socket.id].value + updatedScoreTime.score
+            };
+          }
+          // updating totalScoresObj, if its the first time
+          if (totalScoresObj && !totalScoresObj[socket.id]) {
+            totalScoresObj[socket.id] = {
+              name: users[socket.id].name,
+              value: updatedScoreTime.score
+            };
+          }
+
+          // creating the turnScoresObj if didnt exist
+          if (!turnScoresObj) {
+            roomGameState.turnScores = {};
+          }
+          // updating turnScoresObj, cant be already created
+          if (turnScoresObj && !turnScoresObj[socket.id]) {
+            turnScoresObj[socket.id] = {
+              name: users[socket.id].name,
+              value: updatedScoreTime.score
+            };
+          }
+
+          console.log('updatedScoreTime', updatedScoreTime);
+          console.log('roomGameState', roomGameState);
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
             id: socket.id,
             msg: `El usuario ${users[socket.id].name} acertó la palabra`,
-            totalScores: {},
-            turnScores: {}
+            totalScores: totalScoresObj,
+            turnScores: turnScoresObj
           });
+
+          // Checks if is the last guesser. Fallback of 2 users as default
+          if (Object.keys(roomGameState.turnScores ?? {}).length >= (roomGameState.usersGuessing ?? 2)) {
+            // TODO: update the gameState, and notify the front that the turn is over
+            // clean the turnScores, change drawer, words, reset the cycle
+            console.log('Last guesser');
+          }
           return;
         }
       }
@@ -292,8 +343,13 @@ io.on('connection', (socket) => {
   );
 
   socket.on('starting turn', ({ roomNumber }: { roomNumber: number }) => {
+    const selectedRoom = rooms[roomNumber];
+    const usersInRoom = Object.keys(selectedRoom.users).length;
+    // update the users playing this turn (drawer doesn't count)
+    selectedRoom.gameState.usersGuessing = usersInRoom - 1;
+
     // init turn countdown on front
-    io.to(roomNumber.toString()).emit('countdown turn');
+    io.to(roomNumber.toString()).emit('countdown turn', { usersGuessing: usersInRoom - 1 });
   });
 
   // When someone joins in the middle of a game. The crypted word should be sent
