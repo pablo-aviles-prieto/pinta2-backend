@@ -138,21 +138,23 @@ io.on('connection', (socket) => {
             };
           }
 
-          // TODO: Send to the guesser a notify to display in the front
+          // TODO: Need to update the turnScore and totalScore for the drawer aswell, the rest seems ok at the moment.
+          // TODO: Send to the guesser a notify to display in the front that he guessed it correctly
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
             id: socket.id,
             msg: `El usuario ${users[socket.id].name} acertó la palabra`,
             totalScores: totalScoresObj,
-            turnScores: turnScoresObj
+            turnScores: turnScoresObj,
+            updatedTime: updatedScoreTime.updatedTime
           });
 
           // Checks if is the last guesser. Fallback of 2 users as default
           if (Object.keys(roomGameState.turnScores ?? {}).length >= (roomGameState.usersGuessing ?? 2)) {
             // TODO: update the gameState, and notify the front that the turn is over
             // clean the turnScores, change drawer, words, reset the cycle, etc
-            // send finish turn event to initiate a newTurn
+            // send finish turn event to initiate a newTurn!
             console.log('Last guesser');
           }
           return;
