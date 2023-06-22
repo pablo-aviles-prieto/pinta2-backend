@@ -8,7 +8,7 @@ import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
 import { obscureString, shuffleArray } from './utils';
-import { DEFAULT_TURN_DURATION } from './utils/const';
+import { DEFAULT_POINTS_DRAWER, DEFAULT_TURN_DURATION } from './utils/const';
 import { updateScoreAndTime } from './utils/updateScoreAndTime';
 
 const { PORT } = process.env;
@@ -95,6 +95,7 @@ io.on('connection', (socket) => {
         if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
           const turnScoresObj = roomGameState.turnScores;
           const totalScoresObj = roomGameState.totalScores;
+          const drawerId = roomGameState.drawer?.id;
           const isFirstGuesser = Object.keys(turnScoresObj ?? {}).length === 0;
           const updatedScoreTime = updateScoreAndTime({
             remainingTime: turnCount,
@@ -111,18 +112,32 @@ io.on('connection', (socket) => {
           if (!totalScoresObj) {
             roomGameState.totalScores = {};
           }
-          // updating totalScoresObj, in case that the user already scored
+          // updating totalScoresObj, in case that the guesser already scored
           if (totalScoresObj && totalScoresObj[socket.id]) {
             totalScoresObj[socket.id] = {
               ...totalScoresObj[socket.id],
               value: totalScoresObj[socket.id].value + updatedScoreTime.score
             };
           }
-          // updating totalScoresObj, if its the first time
+          // updating totalScoresObj, in case that the drawer already scored
+          if (totalScoresObj && drawerId && totalScoresObj[drawerId]) {
+            totalScoresObj[drawerId] = {
+              ...totalScoresObj[drawerId],
+              value: totalScoresObj[drawerId].value + DEFAULT_POINTS_DRAWER
+            };
+          }
+          // updating totalScoresObj, if its the first time for the guesser
           if (totalScoresObj && !totalScoresObj[socket.id]) {
             totalScoresObj[socket.id] = {
               name: users[socket.id].name,
               value: updatedScoreTime.score
+            };
+          }
+          // updating totalScoresObj, if its the first time for the drawer
+          if (totalScoresObj && drawerId && !totalScoresObj[drawerId]) {
+            totalScoresObj[drawerId] = {
+              name: users[drawerId].name,
+              value: DEFAULT_POINTS_DRAWER
             };
           }
 
@@ -130,16 +145,30 @@ io.on('connection', (socket) => {
           if (!turnScoresObj) {
             roomGameState.turnScores = {};
           }
-          // updating turnScoresObj, cant be already created
+          // updating turnScoresObj for the guesser, cant be already created
           if (turnScoresObj && !turnScoresObj[socket.id]) {
             turnScoresObj[socket.id] = {
               name: users[socket.id].name,
               value: updatedScoreTime.score
             };
           }
+          // updating turnScoresObj for the drawer, if already scored
+          if (turnScoresObj && drawerId && turnScoresObj[drawerId]) {
+            turnScoresObj[drawerId] = {
+              ...turnScoresObj[drawerId],
+              value: turnScoresObj[drawerId].value + DEFAULT_POINTS_DRAWER
+            };
+          }
+          // updating turnScoresObj, if its the first time for the guesser
+          if (turnScoresObj && drawerId && !turnScoresObj[drawerId]) {
+            turnScoresObj[drawerId] = {
+              name: users[drawerId].name,
+              value: DEFAULT_POINTS_DRAWER
+            };
+          }
 
-          // TODO: Need to update the turnScore and totalScore for the drawer aswell, the rest seems ok at the moment.
-          // TODO: Send to the guesser a notify to display in the front that he guessed it correctly
+          // TODO: Send to the guesser a notify to display in the front that he guessed it correctly!
+          // the rest of users will know since front already knows the score updated
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
@@ -154,9 +183,10 @@ io.on('connection', (socket) => {
           if (Object.keys(roomGameState.turnScores ?? {}).length >= (roomGameState.usersGuessing ?? 2)) {
             // TODO: update the gameState, and notify the front that the turn is over
             // clean the turnScores, change drawer, words, reset the cycle, etc
-            // send finish turn event to initiate a newTurn!
+            // send finish turn event to initiate a newTurn
             console.log('Last guesser');
           }
+          console.dir(rooms, { depth: null });
           return;
         }
       }
