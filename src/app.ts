@@ -8,7 +8,7 @@ import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
 import { obscureString, shuffleArray } from './utils';
-import { DEFAULT_POINTS_DRAWER, DEFAULT_TURN_DURATION } from './utils/const';
+import { DEFAULT_CATEGORY_SELECTED, DEFAULT_POINTS_DRAWER, DEFAULT_TURN_DURATION } from './utils/const';
 import { updateScoreAndTime } from './utils/updateScoreAndTime';
 
 const { PORT } = process.env;
@@ -305,7 +305,7 @@ io.on('connection', (socket) => {
 
   socket.on('init game', ({ roomNumber }: { roomNumber: number }) => {
     const selectedRoom = rooms[roomNumber];
-    const selectedCategory = selectedRoom.gameState.category || 'Aleatorio';
+    const selectedCategory = selectedRoom.gameState.category || DEFAULT_CATEGORY_SELECTED;
     const shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
 
     const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
@@ -321,6 +321,7 @@ io.on('connection', (socket) => {
       drawer: selectedRoom.users[0],
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
+      category: selectedCategory,
       totalScores: scores,
       turnScores: {}
     };
