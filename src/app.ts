@@ -180,7 +180,11 @@ io.on('connection', (socket) => {
           });
 
           // Checks if is the last guesser. Fallback of 2 users as default
-          if (Object.keys(roomGameState.turnScores ?? {}).length >= (roomGameState.usersGuessing ?? 2)) {
+          // Adding 1 to usersGuessing since the drawer will get points aswell
+          if (
+            Object.keys(roomGameState.turnScores ?? {}).length >=
+            (roomGameState.usersGuessing ? roomGameState.usersGuessing + 1 : 2)
+          ) {
             // TODO: update the gameState, and notify the front that the turn is over
             // clean the turnScores, change drawer, words, reset the cycle, etc
             // send finish turn event to initiate a newTurn
