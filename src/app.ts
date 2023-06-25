@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { obscureString, shuffleArray } from './utils';
+import { handleNextTurn, obscureString, shuffleArray } from './utils';
 import { DEFAULT_CATEGORY_SELECTED, DEFAULT_POINTS_DRAWER, DEFAULT_TURN_DURATION } from './utils/const';
 import { updateScoreAndTime } from './utils/updateScoreAndTime';
 
@@ -167,7 +167,7 @@ io.on('connection', (socket) => {
             };
           }
 
-          // TODO: Send to the guesser a notify to display in the front that he guessed it correctly!
+          // ?TODO: Send to the guesser a notify to display in the front that he guessed it correctly!
           // the rest of users will know since front already knows the score updated
 
           // Sending the updated scores
@@ -185,10 +185,21 @@ io.on('connection', (socket) => {
             Object.keys(roomGameState.turnScores ?? {}).length >=
             (roomGameState.usersGuessing ? roomGameState.usersGuessing + 1 : 2)
           ) {
-            // TODO: update the gameState, and notify the front that the turn is over
-            // clean the turnScores, change drawer, words, reset the cycle, etc
-            // send finish turn event to initiate a newTurn
-            console.log('Last guesser');
+            const { nextDrawer, previousWords, nextRound, nextTurn } = handleNextTurn({
+              currentGameState: roomGameState,
+              currentUserList: rooms[roomNumber].users
+            });
+            const newState: GameStateI = {
+              ...roomGameState,
+              drawer: nextDrawer,
+              previousWords,
+              round: nextRound,
+              turn: nextTurn,
+              preTurn: true
+            };
+            rooms[roomNumber].gameState = newState;
+            io.to(roomNumber.toString()).emit('show scoreboard');
+            io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
           }
           console.dir(rooms, { depth: null });
           return;
@@ -319,6 +330,8 @@ io.on('connection', (socket) => {
       started: true,
       words: shuffledArray,
       drawer: selectedRoom.users[0],
+      round: 1,
+      turn: 0,
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
       category: selectedCategory,
@@ -327,7 +340,7 @@ io.on('connection', (socket) => {
     };
     selectedRoom.gameState = initialGameState;
 
-    io.to(roomNumber.toString()).emit('game initialized', { gameState: initialGameState });
+    io.to(roomNumber.toString()).emit('update game state front', { gameState: initialGameState });
 
     const drawerId = selectedRoom.users[0].id;
     selectedRoom.users.forEach((user) => {
@@ -336,46 +349,28 @@ io.on('connection', (socket) => {
       }
     });
     const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
-    io.to(drawerId).emit('pre turn drawer', { possibleWords, prevTurn: undefined });
+    io.to(drawerId).emit('pre turn drawer', { possibleWords });
   });
 
-  socket.on(
-    'set drawer word',
-    ({
-      roomNumber,
-      word,
-      round,
-      turn,
-      previousWords
-    }: {
-      roomNumber: number;
-      word: string;
-      round: number;
-      turn: number;
-      previousWords: number;
-    }) => {
-      const selectedRoom = rooms[roomNumber];
-      const cryptedWord = obscureString(word);
-      const newGameState: GameStateI = {
-        ...selectedRoom.gameState,
-        currentWord: word,
-        cryptedWord,
-        previousWords,
-        round,
-        turn,
-        preTurn: false
-      };
+  socket.on('set drawer word', ({ roomNumber, word }: { roomNumber: number; word: string }) => {
+    const selectedRoom = rooms[roomNumber];
+    const cryptedWord = obscureString(word);
+    const newGameState: GameStateI = {
+      ...selectedRoom.gameState,
+      currentWord: word,
+      cryptedWord,
+      preTurn: false
+    };
 
-      selectedRoom.gameState = newGameState;
+    selectedRoom.gameState = newGameState;
 
-      io.to(roomNumber.toString()).emit('update game state', {
-        gameState: newGameState
-      });
+    io.to(roomNumber.toString()).emit('update game state front', {
+      gameState: newGameState
+    });
 
-      // init preTurn countdown on front
-      io.to(roomNumber.toString()).emit('countdown preDraw start');
-    }
-  );
+    // init preTurn countdown on front
+    io.to(roomNumber.toString()).emit('countdown preDraw start');
+  });
 
   socket.on('starting turn', ({ roomNumber }: { roomNumber: number }) => {
     const selectedRoom = rooms[roomNumber];
@@ -387,7 +382,32 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('countdown turn', { usersGuessing: usersInRoom - 1 });
   });
 
-  // When someone joins in the middle of a game. The crypted word should be sent
+  socket.on('turn finished', ({ roomNumber }: { roomNumber: number }) => {
+    const { nextDrawer, previousWords, nextRound, nextTurn } = handleNextTurn({
+      currentGameState: rooms[roomNumber].gameState,
+      currentUserList: rooms[roomNumber].users
+    });
+    const newState = {
+      ...rooms[roomNumber].gameState,
+      drawer: nextDrawer,
+      previousWords,
+      round: nextRound,
+      turn: nextTurn,
+      preTurn: true
+    };
+    rooms[roomNumber].gameState = newState;
+    io.to(roomNumber.toString()).emit('show scoreboard');
+    io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+  });
+
+  // TODO: When someone joins in the middle of a game. The crypted word should be sent
+  // TODO: Recieve an event to update the word with more letters displayed (more hints)
+
+  // TODO: send the event when scoreboard finish (drawer already changed)
+  // TODO: Back will send the pre turn drawer and front will answer with set drawer word event
+  // and keep the cycle
+
+  // TODO: Watch when is the last turn in the last round to send a finish game event
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));
