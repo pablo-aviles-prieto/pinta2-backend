@@ -46,6 +46,7 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
+  // TODO: When someone disconnects, check how to handle for the room that has a game going on
   socket.on('disconnect', () => {
     usersAmount--;
     const username = users[socket.id].name;
@@ -345,7 +346,7 @@ io.on('connection', (socket) => {
     const drawerId = selectedRoom.users[0].id;
     selectedRoom.users.forEach((user) => {
       if (user.id !== drawerId) {
-        io.to(user.id).emit('pre turn no drawer', { message: 'Waiting for the drawer to chose a word' });
+        io.to(user.id).emit('pre turn no drawer', { message: 'Esperando que seleccione palabra...' });
       }
     });
     const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
@@ -400,12 +401,33 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
   });
 
-  // TODO: When someone joins in the middle of a game. The crypted word should be sent
-  // TODO: Recieve an event to update the word with more letters displayed (more hints)
+  socket.on('scoreboard finished', ({ roomNumber }: { roomNumber: number }) => {
+    const selectedRoom = rooms[roomNumber];
+    const gameState = rooms[roomNumber].gameState;
+    const prevWords = gameState.previousWords ?? 0;
+    // const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
+    const possibleWords = gameState.words
+      ? [gameState.words[prevWords], gameState.words[prevWords + 1], gameState.words[prevWords + 2]]
+      : ['Fallback1', 'Fallback2', 'Fallback3'];
+    const newState: GameStateI = {
+      ...rooms[roomNumber].gameState,
+      preTurn: true,
+      turnScores: {}
+    };
+    rooms[roomNumber].gameState = newState;
 
-  // TODO: send the event when scoreboard finish (drawer already changed)
-  // TODO: Back will send the pre turn drawer and front will answer with set drawer word event
-  // and keep the cycle
+    const drawerId = gameState.drawer?.id ?? selectedRoom.users[0].id;
+    selectedRoom.users.forEach((user) => {
+      if (user.id !== drawerId) {
+        io.to(user.id).emit('pre turn no drawer', { message: 'Esperando que seleccione palabra...' });
+      }
+    });
+    io.to(drawerId).emit('pre turn drawer', { possibleWords });
+    io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+  });
+
+  // TODO: When someone joins in the middle of a game. The crypted word should be sent
+  // TODO: Recieve an event to update the word with more letters shown (more hints)
 
   // TODO: Watch when is the last turn in the last round to send a finish game event
 });
