@@ -7,9 +7,13 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { handleNextTurn, obscureString, shuffleArray } from './utils';
-import { DEFAULT_CATEGORY_SELECTED, DEFAULT_POINTS_DRAWER, DEFAULT_TURN_DURATION } from './utils/const';
-import { updateScoreAndTime } from './utils/updateScoreAndTime';
+import { getCategoriesAndTurnDuration, handleNextTurn, obscureString, shuffleArray, updateScoreAndTime } from './utils';
+import {
+  DEFAULT_CATEGORY_SELECTED,
+  DEFAULT_MAX_ROUNDS,
+  DEFAULT_POINTS_DRAWER,
+  DEFAULT_TURN_DURATION
+} from './utils/const';
 
 const { PORT } = process.env;
 
@@ -199,8 +203,13 @@ io.on('connection', (socket) => {
               preTurn: true
             };
             rooms[roomNumber].gameState = newState;
-            io.to(roomNumber.toString()).emit('show scoreboard');
             io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+            // Checks if this was the last turn
+            if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
+              io.to(roomNumber.toString()).emit('game ended', { owner: rooms[roomNumber].owner });
+              return;
+            }
+            io.to(roomNumber.toString()).emit('show scoreboard');
           }
           console.dir(rooms, { depth: null });
           return;
@@ -279,8 +288,7 @@ io.on('connection', (socket) => {
 
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
       const roomOwner = selectedRoom.owner;
-      const categories = Object.keys(words);
-      const possibleTurnDurations = { min: 60000, default: DEFAULT_TURN_DURATION, max: 180000 };
+      const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
     }
 
@@ -301,6 +309,7 @@ io.on('connection', (socket) => {
 
   socket.on('set room category', ({ category, roomNumber }: { category: string; roomNumber: number }) => {
     rooms[roomNumber].gameState.category = category;
+    socket.to(roomNumber.toString()).emit('update category front', { category });
   });
 
   socket.on('set turn duration', ({ turnDuration, roomNumber }: { turnDuration: number; roomNumber: number }) => {
@@ -325,13 +334,13 @@ io.on('connection', (socket) => {
       return acc;
     }, {});
 
-    // TODO: Set a better way to shuffle the users in a room to pick the drawers.
     const initialGameState: GameStateI = {
       ...selectedRoom.gameState,
       started: true,
       words: shuffledArray,
       drawer: selectedRoom.users[0],
       round: 1,
+      maxRounds: selectedRoom.gameState.maxRounds ?? DEFAULT_MAX_ROUNDS,
       turn: 0,
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
@@ -340,7 +349,6 @@ io.on('connection', (socket) => {
       turnScores: {}
     };
     selectedRoom.gameState = initialGameState;
-
     io.to(roomNumber.toString()).emit('update game state front', { gameState: initialGameState });
 
     const drawerId = selectedRoom.users[0].id;
@@ -397,15 +405,20 @@ io.on('connection', (socket) => {
       preTurn: true
     };
     rooms[roomNumber].gameState = newState;
-    io.to(roomNumber.toString()).emit('show scoreboard');
     io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+    // Checks if this was the last turn
+    if (nextRound > (rooms[roomNumber].gameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
+      const owner = rooms[roomNumber].owner;
+      io.to(roomNumber.toString()).emit('game ended', { owner });
+      return;
+    }
+    io.to(roomNumber.toString()).emit('show scoreboard');
   });
 
   socket.on('scoreboard finished', ({ roomNumber }: { roomNumber: number }) => {
     const selectedRoom = rooms[roomNumber];
     const gameState = rooms[roomNumber].gameState;
     const prevWords = gameState.previousWords ?? 0;
-    // const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
     const possibleWords = gameState.words
       ? [gameState.words[prevWords], gameState.words[prevWords + 1], gameState.words[prevWords + 2]]
       : ['Fallback1', 'Fallback2', 'Fallback3'];
@@ -426,10 +439,21 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
   });
 
-  // TODO: When someone joins in the middle of a game. The crypted word should be sent
-  // TODO: Recieve an event to update the word with more letters shown (more hints)
+  socket.on('restart game', ({ roomNumber }: { roomNumber: number }) => {
+    const selectedRoom = rooms[roomNumber];
+    const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
+    const newState = { started: false };
+    selectedRoom.gameState = newState;
+    io.to(roomNumber.toString()).emit('close endgame modal');
+    io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+    io.to(selectedRoom.owner).emit('pre game owner', { categories, possibleTurnDurations });
+  });
 
-  // TODO: Watch when is the last turn in the last round to send a finish game event
+  // TODO: When someone joins in the middle of a game. The crypted word should be sent
+  // TODO: If someone leaves or joins, has to modify the totalScores and probably turnScores
+  // TODO: Recieve an event to update the word with more letters to show (more hints)
+
+  // TODO: Create logic to modify in the config game, the max rounds to play
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));

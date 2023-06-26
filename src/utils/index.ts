@@ -5,3 +5,5 @@ export { shuffleArray } from './shuffleArray';
 export { obscureString } from './obscureString';
 export { getRemaniningPercentageTime } from './getRemaniningPercentageTime';
 export { handleNextTurn } from './handleNextTurn';
+export { getCategoriesAndTurnDuration } from './getCategoriesAndTurnDuration';
+export { updateScoreAndTime } from './updateScoreAndTime';
