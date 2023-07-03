@@ -58,10 +58,31 @@ io.on('connection', (socket) => {
 
     if (roomNumber) {
       const selectedRoom = rooms[roomNumber];
+      const turnScoresRoom = selectedRoom.gameState.turnScores;
+
+      // Checking if its the drawer
+      if (selectedRoom.gameState.drawer?.id === socket.id) {
+        console.log('Drawer left');
+        // Substract in totalScores all the points in the turnScores
+        // Delete the user from totalScore
+        // Remove the turnScores
+        // pass next turn
+        // send updated gameState
+      }
+
+      // Checking if the user scored (being no drawer)
+      if (turnScoresRoom && turnScoresRoom[socket.id]) {
+        console.log('Random user left');
+        // remove the user from the turnScores and from totalScores
+        // send updated gameState
+      }
+
+      // TODO: Update gameState if someone leaves to know the user usersGuessing and send update gameState
+
       // Find the index of the user in the room's users array
       const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
+      // Remove the user from the room's users array
       if (userIndex !== -1) {
-        // Remove the user from the room's users array
         selectedRoom.users.splice(userIndex, 1);
       }
 
@@ -164,7 +185,7 @@ io.on('connection', (socket) => {
               value: turnScoresObj[drawerId].value + DEFAULT_POINTS_DRAWER
             };
           }
-          // updating turnScoresObj, if its the first time for the guesser
+          // updating turnScoresObj, if its the first time for the drawer
           if (turnScoresObj && drawerId && !turnScoresObj[drawerId]) {
             turnScoresObj[drawerId] = {
               name: users[drawerId].name,
