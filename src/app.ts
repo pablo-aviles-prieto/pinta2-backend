@@ -7,7 +7,14 @@ import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
-import { getCategoriesAndTurnDuration, handleNextTurn, obscureString, shuffleArray, updateScoreAndTime } from './utils';
+import {
+  getCategoriesAndTurnDuration,
+  handleNextTurn,
+  handleRemoveUser,
+  obscureString,
+  shuffleArray,
+  updateScoreAndTime
+} from './utils';
 import {
   DEFAULT_CATEGORY_SELECTED,
   DEFAULT_MAX_ROUNDS,
@@ -59,10 +66,24 @@ io.on('connection', (socket) => {
     if (roomNumber) {
       const selectedRoom = rooms[roomNumber];
 
-      // If there are no more users in the room, delete the room and return
+      // If there are no more users in the room, delete the room, the user and return
       if (selectedRoom.users.length <= 1) {
         delete rooms[roomNumber];
         console.info(`Last user (${username}) left the room ${roomNumber}, deleted room!`);
+        handleRemoveUser({ socket, username, users, usersAmount });
+        return;
+      }
+
+      // checking if its lesser or equal than 3 since the user is not deleted yet from the obj
+      if (selectedRoom.users.length <= 3) {
+        // TODO: Update the users
+        // io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
+
+        // TODO: Send an event like 'not enough users' to notify the front
+        // change the owner of the room (if necessary)
+        // send the owner as prop so he can display the button when enough players in the room
+        // from the front, it should send a 'restart game' event when at least 3 players
+        handleRemoveUser({ socket, username, users, usersAmount });
         return;
       }
 
@@ -83,12 +104,17 @@ io.on('connection', (socket) => {
         const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
         // updating the next round if necessary
         const nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round ? roomGameState.round + 1 : 1;
-        // updating the next turn. If its not the last index the drawer, we just assign the same turn, since the drawer
-        // will be removed from the users array
+        // updating the next turn. If its not the last index the drawer, we just assign the same turn,
+        // since the drawer will be removed from the users array
         const nextTurn = !wasLastTurn ? roomGameState.turn : 0;
         // If its not the last turn, we get the next user and assign it
         const nextDrawer = wasLastTurn ? selectedRoom.users[0] : selectedRoom.users[drawerIndex + 1];
         const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
+
+        // Remove the user from the totalScores object if exists:
+        if (roomGameState.totalScores?.hasOwnProperty(socket.id)) {
+          delete roomGameState.totalScores[socket.id];
+        }
         const newState: GameStateI = {
           ...roomGameState,
           drawer: nextDrawer,
@@ -96,39 +122,36 @@ io.on('connection', (socket) => {
           round: nextRound,
           turn: nextTurn,
           turnScores: {},
-          preTurn: true
+          preTurn: true,
+          usersGuessing: roomGameState.usersGuessing ? roomGameState.usersGuessing - 1 : 0
         };
         selectedRoom.gameState = newState;
-
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+
         // Checks if this was the last turn
         if ((nextRound ?? 0) > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
-          const isDrawerAndOwner = selectedRoom.owner === socket.id;
+          const isOwner = selectedRoom.owner === socket.id;
           // If the drawer is the owner, we pass the owner to the next user
           // since the owner is the index 0 in the selectedRoom users array
-          const newOwner = isDrawerAndOwner ? selectedRoom.users[1].id : selectedRoom.owner;
+          const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
-          return;
+        } else {
+          io.to(roomNumber.toString()).emit('show scoreboard');
         }
-        io.to(roomNumber.toString()).emit('show scoreboard');
       }
 
-      // Checking if the user who left scored (being no drawer)
-      // TODO check that is not the drawer?
-      if (roomGameState.turnScores && roomGameState.turnScores[socket.id]) {
+      // Checking if the user who left, already scored (being no drawer)
+      if (
+        roomGameState.turnScores &&
+        roomGameState.turnScores[socket.id] &&
+        selectedRoom.gameState.drawer?.id !== socket.id
+      ) {
         console.log('Random user left');
         // remove the user from the turnScores and from totalScores
+        // Check if after the removed from turnScores, there is still more people to guess or the turn should end
         // update usersGuessing prop
         // send updated gameState
-        // handle next turn
       }
-
-      // Remove the user from the totalScores object if exists:
-      if (roomGameState.totalScores?.hasOwnProperty(socket.id)) {
-        delete roomGameState.totalScores[socket.id];
-      }
-
-      // TODO: Update gameState if someone leaves to know the user usersGuessing and send update gameState
 
       // Find the index of the user in the room's users array
       const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
@@ -138,25 +161,16 @@ io.on('connection', (socket) => {
       }
 
       // Check if the user disconnecting is the owner it pass the ownership to the next user
-      if (selectedRoom.owner === socket.id && selectedRoom.users.length > 0) {
+      if (selectedRoom.owner === socket.id) {
         selectedRoom.owner = selectedRoom.users[0].id;
       }
 
       // Update the userList
       io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
-
-      // // If there are no more users in the room, delete the room
-      // if (selectedRoom.users.length === 0) {
-      //   delete rooms[roomNumber];
-      //   console.info(`Last user (${username}) left the room ${roomNumber}, deleted room!`);
-      // } else {
-      //   // In case there are more users, update the userList to them
-      //   io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
-      // }
     }
 
-    delete users[socket.id];
-    console.info(`${username} disconnected // Total users => ${usersAmount}`);
+    handleRemoveUser({ socket, username, users, usersAmount });
+    console.dir(rooms, { depth: null });
   });
 
   socket.on(

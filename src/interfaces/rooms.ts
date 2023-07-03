@@ -12,7 +12,7 @@ export interface GameStateI {
   previousWords?: number; // number of used words in the game (next turn can get the words starting with the index of this number)
   drawer?: UserI;
   round?: number; // the current round number (initialize in 1)
-  maxRounds?: number;
+  maxRounds?: number; // establish the last round number to be played (default as 2)
   turn?: number; // the current drawing turn (initialize in 0)
   preTurn?: boolean;
   turnDuration?: number; // number in ms
