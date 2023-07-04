@@ -8,3 +8,4 @@ export { handleNextTurn } from './handleNextTurn';
 export { getCategoriesAndTurnDuration } from './getCategoriesAndTurnDuration';
 export { updateScoreAndTime } from './updateScoreAndTime';
 export { handleRemoveUser, handleRemoveUserOnRoom } from './handleRemoveUser';
+export { updateListMessage } from './updateListMessage';

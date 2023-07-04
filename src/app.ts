@@ -14,6 +14,7 @@ import {
   handleRemoveUserOnRoom,
   obscureString,
   shuffleArray,
+  updateListMessage,
   updateScoreAndTime
 } from './utils';
 import {
@@ -65,8 +66,6 @@ io.on('connection', (socket) => {
 
     // Checks if the user joined a room
     if (roomNumber) {
-      // TODO: When sending the event 'update user list', send a msg prop so the front!
-      // can toastify the message of a user joining/leaving
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -186,7 +185,7 @@ io.on('connection', (socket) => {
         roomGameState.turnScores[socket.id] &&
         selectedRoom.gameState.drawer?.id !== socket.id
       ) {
-        // TODO: finish this shit
+        // TODO: finish this shit!
         console.log('Random user left');
         // remove the user from the turnScores and from totalScores
         // Check if after the removed from turnScores, there is still more people to guess or the turn should end
@@ -420,11 +419,20 @@ io.on('connection', (socket) => {
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
     }
 
-    io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
-    // respond to the joining socket with success
+    io.to(roomNumber.toString()).emit('update user list', {
+      newUsers: selectedRoom.users,
+      action: 'join',
+      msg: updateListMessage({ username, action: 'join' })
+    });
     // TODO: send the gameState to the joined user from a no drawer
     // TODO: send what has been drawed until now
     // the joined user, in case that is not a preTurn, he shouldnt be able to draw and chat
+
+    // TODO: send a prop in thge join room response to let know the front if the game is in a turn being
+    // played, so he cant draw and chat. In the front, in the pre turn no drawer (maybe drawer aswell),
+    // has to delete the state that blocks the user to draw and chat
+
+    // respond to the joining socket with success
     socket.emit('join room response', {
       success: true,
       message: 'Successfully joined room',

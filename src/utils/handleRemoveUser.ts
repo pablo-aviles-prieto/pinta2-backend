@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomsI, UsersI } from '../interfaces';
 import { DefaultEventsMap } from 'socket.io/dist/typed-events';
+import { updateListMessage } from './updateListMessage';
 
 interface RemoveUserProps {
   users: {
@@ -40,8 +41,11 @@ export const handleRemoveUserOnRoom = ({
   if (userIndex !== -1) {
     selectedRoom.users.splice(userIndex, 1);
   }
-  // TODO: send a msg prop to the front in the 'update user list', notifying the user leaving
-  io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
+  io.to(roomNumber.toString()).emit('update user list', {
+    newUsers: selectedRoom.users,
+    action: 'left',
+    msg: updateListMessage({ username, action: 'left' })
+  });
   if (isOwner) {
     selectedRoom.owner = selectedRoom.users[0].id;
   }
