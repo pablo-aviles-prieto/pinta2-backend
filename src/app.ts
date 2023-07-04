@@ -58,7 +58,6 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
-  // TODO: When someone disconnects, check how to handle for the room that has a game going on
   socket.on('disconnect', () => {
     usersAmount--;
     const username = users[socket.id].name;
@@ -66,7 +65,7 @@ io.on('connection', (socket) => {
 
     // Checks if the user joined a room
     if (roomNumber) {
-      // TODO: When sending the event 'update user list', send a msg prop so the front
+      // TODO: When sending the event 'update user list', send a msg prop so the front!
       // can toastify the message of a user joining/leaving
       const selectedRoom = rooms[roomNumber];
 
@@ -95,6 +94,14 @@ io.on('connection', (socket) => {
           isOwner
         });
         return;
+      }
+
+      // checks if its in the endGame and who left was the owner
+      if (selectedRoom.gameState.endGame && selectedRoom.owner === socket.id) {
+        // TODO: Send a 'resend game ended' so the front will update the setEndGameContent
+        const newOwner = selectedRoom.users[1].id;
+        io.to(roomNumber.toString()).emit('resend game ended', { owner: newOwner });
+        // for the new owner in case the owner leaves, and other user want to restart the game
       }
 
       // Not enough players on room, game cancelled
@@ -166,7 +173,7 @@ io.on('connection', (socket) => {
           // If the drawer is the owner, we pass the owner to the next user
           // since the owner is the index 0 in the selectedRoom users array
           const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
-          // TODO: Change the gameEndend prop to true in gameState
+          selectedRoom.gameState.endGame = true;
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
         } else {
           io.to(roomNumber.toString()).emit('show scoreboard');
@@ -326,7 +333,7 @@ io.on('connection', (socket) => {
             io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
             // Checks if this was the last turn
             if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
-              // TODO: Change the gameEndend prop to true in gameState
+              rooms[roomNumber].gameState.endGame = true;
               io.to(roomNumber.toString()).emit('game ended', { owner: rooms[roomNumber].owner });
               return;
             }
@@ -466,6 +473,7 @@ io.on('connection', (socket) => {
       preTurn: true,
       turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
       category: selectedCategory,
+      endGame: false,
       totalScores: scores,
       turnScores: {}
     };
@@ -530,7 +538,7 @@ io.on('connection', (socket) => {
     // Checks if this was the last turn
     if (nextRound > (rooms[roomNumber].gameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
       const owner = rooms[roomNumber].owner;
-      // TODO: Change the gameEndend prop to true in gameState
+      rooms[roomNumber].gameState.endGame = true;
       io.to(roomNumber.toString()).emit('game ended', { owner });
       return;
     }
