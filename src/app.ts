@@ -11,6 +11,7 @@ import {
   getCategoriesAndTurnDuration,
   handleNextTurn,
   handleRemoveUser,
+  handleRemoveUserOnRoom,
   obscureString,
   shuffleArray,
   updateScoreAndTime
@@ -63,7 +64,10 @@ io.on('connection', (socket) => {
     const username = users[socket.id].name;
     const roomNumber = users[socket.id]?.room;
 
+    // Checks if the user joined a room
     if (roomNumber) {
+      // TODO: When sending the event 'update user list', send a msg prop so the front
+      // can toastify the message of a user joining/leaving
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -74,16 +78,46 @@ io.on('connection', (socket) => {
         return;
       }
 
+      const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
+      const isOwner = selectedRoom.owner === socket.id;
+
+      // if the game didnt start yet, just update the user list
+      if (!selectedRoom.gameState.started) {
+        handleRemoveUserOnRoom({
+          socket,
+          username,
+          users,
+          usersAmount,
+          userIndex,
+          selectedRoom,
+          roomNumber,
+          io,
+          isOwner
+        });
+        return;
+      }
+
+      // Not enough players on room, game cancelled
       // checking if its lesser or equal than 3 since the user is not deleted yet from the obj
       if (selectedRoom.users.length <= 3) {
-        // TODO: Update the users
-        // io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
+        const newState = { started: false };
+        selectedRoom.gameState = newState;
+        io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+        io.to(roomNumber.toString()).emit('game cancelled', {
+          msg: `Partida cancelada, esperando a que haya el mínimo de jugadores(3) para volver a empezar`
+        });
 
-        // TODO: Send an event like 'not enough users' to notify the front
-        // change the owner of the room (if necessary)
-        // send the owner as prop so he can display the button when enough players in the room
-        // from the front, it should send a 'restart game' event when at least 3 players
-        handleRemoveUser({ socket, username, users, usersAmount });
+        handleRemoveUserOnRoom({
+          socket,
+          username,
+          users,
+          usersAmount,
+          userIndex,
+          selectedRoom,
+          roomNumber,
+          io,
+          isOwner
+        });
         return;
       }
 
@@ -100,15 +134,14 @@ io.on('connection', (socket) => {
           }
         }
 
-        const drawerIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
-        const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
+        const wasLastTurn = userIndex >= Object.keys(selectedRoom.users).length - 1;
         // updating the next round if necessary
         const nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round ? roomGameState.round + 1 : 1;
         // updating the next turn. If its not the last index the drawer, we just assign the same turn,
         // since the drawer will be removed from the users array
         const nextTurn = !wasLastTurn ? roomGameState.turn : 0;
         // If its not the last turn, we get the next user and assign it
-        const nextDrawer = wasLastTurn ? selectedRoom.users[0] : selectedRoom.users[drawerIndex + 1];
+        const nextDrawer = wasLastTurn ? selectedRoom.users[0] : selectedRoom.users[userIndex + 1];
         const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
 
         // Remove the user from the totalScores object if exists:
@@ -128,12 +161,12 @@ io.on('connection', (socket) => {
         selectedRoom.gameState = newState;
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
 
-        // Checks if this was the last turn
+        // Checks if this was the last turn of last round
         if ((nextRound ?? 0) > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
-          const isOwner = selectedRoom.owner === socket.id;
           // If the drawer is the owner, we pass the owner to the next user
           // since the owner is the index 0 in the selectedRoom users array
           const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
+          // TODO: Change the gameEndend prop to true in gameState
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
         } else {
           io.to(roomNumber.toString()).emit('show scoreboard');
@@ -146,6 +179,7 @@ io.on('connection', (socket) => {
         roomGameState.turnScores[socket.id] &&
         selectedRoom.gameState.drawer?.id !== socket.id
       ) {
+        // TODO: finish this shit
         console.log('Random user left');
         // remove the user from the turnScores and from totalScores
         // Check if after the removed from turnScores, there is still more people to guess or the turn should end
@@ -153,20 +187,18 @@ io.on('connection', (socket) => {
         // send updated gameState
       }
 
-      // Find the index of the user in the room's users array
-      const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
-      // Remove the user from the room's users array
-      if (userIndex !== -1) {
-        selectedRoom.users.splice(userIndex, 1);
-      }
-
-      // Check if the user disconnecting is the owner it pass the ownership to the next user
-      if (selectedRoom.owner === socket.id) {
-        selectedRoom.owner = selectedRoom.users[0].id;
-      }
-
-      // Update the userList
-      io.to(roomNumber.toString()).emit('update user list', { newUsers: selectedRoom.users });
+      handleRemoveUserOnRoom({
+        socket,
+        username,
+        users,
+        usersAmount,
+        userIndex,
+        selectedRoom,
+        roomNumber,
+        io,
+        isOwner
+      });
+      return;
     }
 
     handleRemoveUser({ socket, username, users, usersAmount });
@@ -294,6 +326,7 @@ io.on('connection', (socket) => {
             io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
             // Checks if this was the last turn
             if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
+              // TODO: Change the gameEndend prop to true in gameState
               io.to(roomNumber.toString()).emit('game ended', { owner: rooms[roomNumber].owner });
               return;
             }
@@ -408,7 +441,7 @@ io.on('connection', (socket) => {
 
   socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
     io.to(roomNumber.toString()).emit('await more players response', {
-      message: 'The leader is awaiting for more players...'
+      message: 'El anfitrión está esperando por más jugadores...'
     });
   });
 
@@ -497,6 +530,7 @@ io.on('connection', (socket) => {
     // Checks if this was the last turn
     if (nextRound > (rooms[roomNumber].gameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
       const owner = rooms[roomNumber].owner;
+      // TODO: Change the gameEndend prop to true in gameState
       io.to(roomNumber.toString()).emit('game ended', { owner });
       return;
     }

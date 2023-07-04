@@ -7,4 +7,4 @@ export { getRemaniningPercentageTime } from './getRemaniningPercentageTime';
 export { handleNextTurn } from './handleNextTurn';
 export { getCategoriesAndTurnDuration } from './getCategoriesAndTurnDuration';
 export { updateScoreAndTime } from './updateScoreAndTime';
-export { handleRemoveUser } from './handleRemoveUser';
+export { handleRemoveUser, handleRemoveUserOnRoom } from './handleRemoveUser';
