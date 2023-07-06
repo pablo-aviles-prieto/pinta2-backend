@@ -216,8 +216,6 @@ io.on('connection', (socket) => {
         const newState: GameStateI = { ...roomGameState, usersGuessing: newGuessers };
         selectedRoom.gameState = newState;
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
-        // Check if after the removed from turnScores, there is still more people to guess or the turn should end
-        // send updated gameState
       }
 
       // Removing from totalScores if the user didnt score in this turn (being no drawer)
