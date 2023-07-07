@@ -6,7 +6,7 @@ import cors from 'cors';
 import express from 'express';
 import path from 'path';
 import { Server } from 'socket.io';
-import { GameStateI, LinesI, RoomsI, UsersI } from './interfaces';
+import { GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
 import {
   getCategoriesAndTurnDuration,
   handleNextTurn,
@@ -66,6 +66,8 @@ io.on('connection', (socket) => {
 
     // Checks if the user joined a room
     if (roomNumber) {
+      // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
+      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -190,6 +192,11 @@ io.on('connection', (socket) => {
         return;
       }
 
+      // TODO: Test that a user (no drawer) leaves the game (with more players) and it keeps the game to the end
+      // also check when a user leaves when already draw, and when has to draw, and the edge case that the drawer
+      // is 1 before the last, and the user who leaves is the last. CHECK THAT IT KEEPS WORKING
+      // TODO: Test the block when a user disconnect and is not the drawer
+
       const newGuessers = (roomGameState.usersGuessing ?? 2) - 1;
 
       // Removing from turnScores and totalScores in case that the user scored this turn
@@ -231,36 +238,46 @@ io.on('connection', (socket) => {
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
       }
 
-      // Checking if the user was the last one to guess the word.
+      // Checking if the user was the last one remaining to guess the word.
       // Adding 1 to newGuessers because the drawer counts
       if (Object.keys(roomGameState.turnScores ?? {}).length >= newGuessers + 1) {
-        // TODO: adapt correctly the logic for nextTurn and round, since if the drawer is 1 before the last
-        // and the user who left is the last, it should pass one round and reset to 0 the turn
-        // TODO: Need to check if the userIndex is the last and the drawerIndex 1 before the last, in that case
-        // has to change the round.
-
-        // TODO: Test that a user (no drawer) leaves the game (with more players) and it keeps the game to the end
-        // also check when a user leaves when already draw, and when has to draw, and the edge case that the drawer
-        // is 1 before the last, and the user who leaves is the last. CHECK THAT IT KEEPS WORKING
-
         const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id ?? '');
-        const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
-        // updating the next round if necessary
-        const nextRound = !wasLastTurn ? roomGameState.round ?? 1 : roomGameState.round ? roomGameState.round + 1 : 1;
-        // if its not the last turn, we check if the user already drew, in that case we pass the same round,
-        // since the user will disappear. If the user didnt draw, so its bigger than the drawerIndex, we just
-        // add 1 to the turn, since next user will draw
-        const nextTurn = wasLastTurn ? 0 : drawerIndex > userIndex ? roomGameState.turn : (roomGameState.turn ?? 1) + 1;
-        // If its not the last turn, we get the next user and assign it
-        const nextDrawer = wasLastTurn
-          ? selectedRoom.users[0]
-          : drawerIndex > userIndex
-          ? selectedRoom.users[drawerIndex + 1]
-          : userIndex - drawerIndex === 1 // checks if the user who left is the next one compare to the drawer
-          ? selectedRoom.users[drawerIndex + 2] // if the user who left is the next, we pass the drawer to the next user that is not the user who left
-          : selectedRoom.users[drawerIndex + 1]; // if the user is not the next one to the drawer, we just pass the drawer to the next user
-        const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
 
+        let nextRound: number;
+        let nextTurn: number;
+        let nextDrawer: UserI;
+        // checking if the user who left, already drew in the current round
+        if (userIndex < drawerIndex) {
+          if (!roomGameState.turn || !roomGameState.round) return;
+          const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
+          nextTurn = wasLastTurn ? 0 : roomGameState.turn;
+          nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round + 1;
+          nextDrawer = selectedRoom.users[drawerIndex + 1];
+          if (wasLastTurn) {
+            // checking if the user leaving is the 1st, so we assign the drawer to the 2nd user
+            nextDrawer = userIndex === 0 ? selectedRoom.users[1] : selectedRoom.users[0];
+          }
+        } else {
+          // user who left didnt draw yet
+          if (!roomGameState.turn || !roomGameState.round) return;
+          const userWasLast = userIndex >= Object.keys(selectedRoom.users).length - 1;
+          const userIsNextToDrawer = userIndex - drawerIndex === 1;
+          nextTurn = roomGameState.turn + 1;
+          nextRound = roomGameState.round;
+          nextDrawer = selectedRoom.users[drawerIndex + 1];
+          if (userIsNextToDrawer && !userWasLast) {
+            // bypassing the user since is leaving, and we know there is more users after the user leaving
+            nextDrawer = selectedRoom.users[drawerIndex + 2];
+          }
+          if (userWasLast && userIsNextToDrawer) {
+            // isLastTurn => reset the round/turn cycle
+            nextTurn = 0;
+            nextRound = roomGameState.round + 1;
+            nextDrawer = selectedRoom.users[0];
+          }
+        }
+
+        const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
         const newState: GameStateI = {
           ...roomGameState,
           drawer: nextDrawer,
@@ -301,7 +318,7 @@ io.on('connection', (socket) => {
       // handleDisconnectedTurn with the nextTurn, nextRound, previousWords and nextDrawer, so when the front
       // call the 'chat msg' event (cuz last user guessed the word) or the 'turn finished' event (cuz the timer finished)
       // it checks if that prop exist, take those values to handle the next turn, and set it as undefined for next time
-      // -Check if the user drew or not, and in case it didnt, if its the next to draw, or doesnt.
+      // -Check if the user drew or not, and in case it didnt, if its the next to draw, or doesnt.!!
 
       // TODO: update the 'chat msg' and 'turn finished' to check the handleDisconnectedTurn prop in the selectedRoom
 
