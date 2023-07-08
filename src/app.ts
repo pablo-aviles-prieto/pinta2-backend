@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
     // Checks if the user joined a room
     if (roomNumber) {
       // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
-      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!
+      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!!
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -195,7 +195,7 @@ io.on('connection', (socket) => {
       // TODO: Test that a user (no drawer) leaves the game (with more players) and it keeps the game to the end
       // also check when a user leaves when already draw, and when has to draw, and the edge case that the drawer
       // is 1 before the last, and the user who leaves is the last. CHECK THAT IT KEEPS WORKING
-      // TODO: Test the block when a user disconnect and is not the drawer
+      // TODO: Test the block when a user disconnect and is not the drawer!
 
       const newGuessers = (roomGameState.usersGuessing ?? 2) - 1;
 
@@ -242,10 +242,10 @@ io.on('connection', (socket) => {
       // Adding 1 to newGuessers because the drawer counts
       if (Object.keys(roomGameState.turnScores ?? {}).length >= newGuessers + 1) {
         const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id ?? '');
-
         let nextRound: number;
         let nextTurn: number;
         let nextDrawer: UserI;
+
         // checking if the user who left, already drew in the current round
         if (userIndex < drawerIndex) {
           if (!roomGameState.turn || !roomGameState.round) return;
@@ -318,7 +318,7 @@ io.on('connection', (socket) => {
       // handleDisconnectedTurn with the nextTurn, nextRound, previousWords and nextDrawer, so when the front
       // call the 'chat msg' event (cuz last user guessed the word) or the 'turn finished' event (cuz the timer finished)
       // it checks if that prop exist, take those values to handle the next turn, and set it as undefined for next time
-      // -Check if the user drew or not, and in case it didnt, if its the next to draw, or doesnt.!!
+      // -Check if the user drew or not, and in case it didnt, if its the next to draw, or doesnt.!
 
       // TODO: update the 'chat msg' and 'turn finished' to check the handleDisconnectedTurn prop in the selectedRoom
 
