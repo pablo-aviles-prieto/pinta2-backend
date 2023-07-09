@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
     // Checks if the user joined a room
     if (roomNumber) {
       // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
-      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!
+      // there shouldnt be nothing to handle in this case, but CHECK IT OUT
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -129,10 +129,12 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // TODO: Check the case where a user disconnect when in preTurn (showing scoreboards)
-      // it should check if the nextDrawer is the one who left
-
       const roomGameState = selectedRoom.gameState;
+
+      // TODO: Check the case where a user disconnect when in preTurn (showing scoreboards)
+      // it should check if the nextDrawer is the one who left (because in preTurn we already know the next drawer)
+      // and also delete the user from turnScores and totalScores.
+      // If nextDrawer is okay in preTurn, just delete turnScores and totalScores (previousWords is OK)
 
       // Checking if the user who left is the drawer
       if (selectedRoom.gameState.drawer?.id === socket.id) {
@@ -198,7 +200,7 @@ io.on('connection', (socket) => {
       // TODO: Test that a user (no drawer) leaves the game (with more players) and it keeps the game to the end
       // also check when a user leaves when already draw, and when has to draw, and the edge case that the drawer
       // is 1 before the last, and the user who leaves is the last. CHECK THAT IT KEEPS WORKING
-      // TODO: Test the next block when a user disconnect and is not the drawer
+      // TODO: Test the next block when a user disconnect and is not the drawer!
 
       const newGuessers = (roomGameState.usersGuessing ?? 2) - 1;
 
@@ -602,60 +604,63 @@ io.on('connection', (socket) => {
     console.dir(rooms, { depth: null });
   });
 
-  socket.on('set room category', ({ category, roomNumber }: { category: string; roomNumber: number }) => {
-    rooms[roomNumber].gameState.category = category;
-    socket.to(roomNumber.toString()).emit('update category front', { category });
-  });
-
-  socket.on('set turn duration', ({ turnDuration, roomNumber }: { turnDuration: number; roomNumber: number }) => {
-    rooms[roomNumber].gameState.turnDuration = turnDuration;
-    // Sending the turnDuration to all the users except the leader (since it already knows)
-    socket.to(roomNumber.toString()).emit('set new turn duration', { turnDuration });
-  });
-
   socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
     io.to(roomNumber.toString()).emit('await more players response', {
       message: 'El anfitrión/a está esperando por más jugadores...'
     });
   });
 
-  socket.on('init game', ({ roomNumber }: { roomNumber: number }) => {
-    const selectedRoom = rooms[roomNumber];
-    const selectedCategory = selectedRoom.gameState.category || DEFAULT_CATEGORY_SELECTED;
-    const shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
+  socket.on(
+    'init game',
+    ({
+      roomNumber,
+      turnDuration,
+      categorySelected
+    }: {
+      roomNumber: number;
+      turnDuration?: number | null;
+      categorySelected?: string;
+    }) => {
+      const selectedRoom = rooms[roomNumber];
+      const selectedCategory = categorySelected || selectedRoom.gameState.category || DEFAULT_CATEGORY_SELECTED;
+      const selectedTurnDuration = turnDuration || selectedRoom.gameState.turnDuration || DEFAULT_TURN_DURATION;
+      const shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
 
-    const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
-      acc[user.id] = { name: user.name, value: 0 };
-      return acc;
-    }, {});
+      const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
+        acc[user.id] = { name: user.name, value: 0 };
+        return acc;
+      }, {});
 
-    const initialGameState: GameStateI = {
-      ...selectedRoom.gameState,
-      started: true,
-      words: shuffledArray,
-      drawer: selectedRoom.users[0],
-      round: 1,
-      maxRounds: selectedRoom.gameState.maxRounds ?? DEFAULT_MAX_ROUNDS,
-      turn: 0,
-      preTurn: true,
-      turnDuration: selectedRoom.gameState.turnDuration ?? DEFAULT_TURN_DURATION,
-      category: selectedCategory,
-      endGame: false,
-      totalScores: scores,
-      turnScores: {}
-    };
-    selectedRoom.gameState = initialGameState;
-    io.to(roomNumber.toString()).emit('update game state front', { gameState: initialGameState });
+      const initialGameState: GameStateI = {
+        ...selectedRoom.gameState,
+        started: true,
+        words: shuffledArray,
+        drawer: selectedRoom.users[0],
+        round: 1,
+        maxRounds: selectedRoom.gameState.maxRounds ?? DEFAULT_MAX_ROUNDS,
+        turn: 0,
+        preTurn: true,
+        turnDuration: selectedTurnDuration,
+        category: selectedCategory,
+        endGame: false,
+        totalScores: scores,
+        turnScores: {}
+      };
+      socket.to(roomNumber.toString()).emit('update category front', { category: selectedCategory });
+      socket.to(roomNumber.toString()).emit('set new turn duration', { turnDuration: selectedTurnDuration });
+      selectedRoom.gameState = initialGameState;
+      io.to(roomNumber.toString()).emit('update game state front', { gameState: initialGameState });
 
-    const drawerId = selectedRoom.users[0].id;
-    selectedRoom.users.forEach((user) => {
-      if (user.id !== drawerId) {
-        io.to(user.id).emit('pre turn no drawer', { message: 'Esperando que seleccione palabra...' });
-      }
-    });
-    const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
-    io.to(drawerId).emit('pre turn drawer', { possibleWords });
-  });
+      const drawerId = selectedRoom.users[0].id;
+      selectedRoom.users.forEach((user) => {
+        if (user.id !== drawerId) {
+          io.to(user.id).emit('pre turn no drawer', { message: 'Esperando que seleccione palabra...' });
+        }
+      });
+      const possibleWords = [shuffledArray[0], shuffledArray[1], shuffledArray[2]];
+      io.to(drawerId).emit('pre turn drawer', { possibleWords });
+    }
+  );
 
   socket.on('set drawer word', ({ roomNumber, word }: { roomNumber: number; word: string }) => {
     const selectedRoom = rooms[roomNumber];
