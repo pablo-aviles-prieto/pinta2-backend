@@ -3,6 +3,13 @@ export interface UserI {
   name: string;
 }
 
+interface NextTurnInfoI {
+  nextTurn: number;
+  nextRound: number;
+  nextDrawer: UserI;
+  previousWords: number;
+}
+
 export interface GameStateI {
   started: boolean;
   category?: string;
@@ -33,4 +40,5 @@ export interface RoomsI {
   password: string;
   users: UserI[];
   gameState: GameStateI;
+  nextTurnInfo: NextTurnInfoI | undefined;
 }
