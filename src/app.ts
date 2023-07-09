@@ -129,6 +129,9 @@ io.on('connection', (socket) => {
         return;
       }
 
+      // TODO: Check the case where a user disconnect when in preTurn (showing scoreboards)
+      // it should check if the nextDrawer is the one who left
+
       const roomGameState = selectedRoom.gameState;
 
       // Checking if the user who left is the drawer
@@ -246,7 +249,7 @@ io.on('connection', (socket) => {
 
       // checking if the user who left, already drew in the current round
       if (userIndex < drawerIndex) {
-        if (!roomGameState.turn || !roomGameState.round) return;
+        if (roomGameState.turn === undefined || roomGameState.round === undefined) return;
         const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
         nextTurn = wasLastTurn ? 0 : roomGameState.turn;
         nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round + 1;
@@ -256,7 +259,7 @@ io.on('connection', (socket) => {
           nextDrawer = userIndex === 0 ? selectedRoom.users[1] : selectedRoom.users[0];
         }
       } else {
-        if (!roomGameState.turn || !roomGameState.round) return;
+        if (roomGameState.turn === undefined || roomGameState.round === undefined) return;
         const userWasLast = userIndex >= Object.keys(selectedRoom.users).length - 1;
         const userIsNextToDrawer = userIndex - drawerIndex === 1;
         nextTurn = roomGameState.turn + 1;
