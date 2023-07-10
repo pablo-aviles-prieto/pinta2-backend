@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
     // Checks if the user joined a room
     if (roomNumber) {
       // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
-      // there shouldnt be nothing to handle in this case, but CHECK IT OUT
+      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -131,13 +131,8 @@ io.on('connection', (socket) => {
 
       const roomGameState = selectedRoom.gameState;
 
-      // TODO: Check the case where a user disconnect when in preTurn (showing scoreboards)
-      // it should check if the nextDrawer is the one who left (because in preTurn we already know the next drawer)
-      // and also delete the user from turnScores and totalScores.
-      // If nextDrawer is okay in preTurn, just delete turnScores and totalScores (previousWords is OK)
-
-      // Checking if the user who left is the drawer
-      if (selectedRoom.gameState.drawer?.id === socket.id) {
+      // Checking if the user who left is the drawer and is not in preTurn
+      if (selectedRoom.gameState.drawer?.id === socket.id && !selectedRoom.gameState.preTurn) {
         // If there are scores in turnScores, substract it on totalScores
         if (roomGameState.turnScores && roomGameState.totalScores) {
           for (const key in roomGameState.turnScores) {
@@ -197,11 +192,6 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // TODO: Test that a user (no drawer) leaves the game (with more players) and it keeps the game to the end
-      // also check when a user leaves when already draw, and when has to draw, and the edge case that the drawer
-      // is 1 before the last, and the user who leaves is the last. CHECK THAT IT KEEPS WORKING
-      // TODO: Test the next block when a user disconnect and is not the drawer!
-
       const newGuessers = (roomGameState.usersGuessing ?? 2) - 1;
 
       // Removing from turnScores and totalScores in case that the user scored this turn
@@ -244,6 +234,81 @@ io.on('connection', (socket) => {
       }
 
       const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id ?? '');
+
+      // If its in preTurn, it just remove the user, and handle edge cases on drawer
+      if (selectedRoom.gameState.preTurn) {
+        // Remove the user from the totalScores object (doesnt match the if condition in previous blocks)
+        if (roomGameState.totalScores && roomGameState.totalScores[socket.id]) {
+          delete roomGameState.totalScores[socket.id];
+        }
+
+        // In preTurn, the drawer, round, turn and previousWords has been updated for next turn
+        let newState: GameStateI = { ...roomGameState, usersGuessing: newGuessers };
+        if (selectedRoom.gameState.drawer?.id === socket.id) {
+          // Checking if the drawer is the next last turn and if it resets to a new round
+          if (drawerIndex >= Object.keys(selectedRoom.users).length - 1) {
+            const nextRound = (roomGameState.round ?? 1) + 1;
+            newState = {
+              ...roomGameState,
+              usersGuessing: newGuessers,
+              drawer: selectedRoom.users[0],
+              turn: 0,
+              round: nextRound
+            };
+            // Checks if this was the last turn of the last round
+            if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
+              io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+              // If the user who left is the owner, we pass the owner to the next user
+              const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
+              selectedRoom.gameState.endGame = true;
+              io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
+              handleRemoveUserOnRoom({
+                socket,
+                username,
+                users,
+                usersAmount,
+                userIndex,
+                selectedRoom,
+                roomNumber,
+                io,
+                isOwner
+              });
+              return;
+            }
+          } else {
+            newState = {
+              ...roomGameState,
+              usersGuessing: newGuessers,
+              drawer: selectedRoom.users[drawerIndex + 1]
+            };
+          }
+        }
+
+        // checking if the user who left, already drew in the current round
+        if (userIndex < drawerIndex) {
+          newState = {
+            ...roomGameState,
+            usersGuessing: newGuessers,
+            turn: (roomGameState.turn ?? 1) - 1
+          };
+        }
+
+        selectedRoom.gameState = newState;
+        io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
+        handleRemoveUserOnRoom({
+          socket,
+          username,
+          users,
+          usersAmount,
+          userIndex,
+          selectedRoom,
+          roomNumber,
+          io,
+          isOwner
+        });
+        return;
+      }
+
       let nextRound: number;
       let nextTurn: number;
       let nextDrawer: UserI;
@@ -281,6 +346,7 @@ io.on('connection', (socket) => {
 
       // Checking if the user was the last one remaining to guess the word.
       // Adding 1 to newGuessers because the drawer counts
+      // Also checking for !preTurn, since the score is not updated in preTurn
       if (Object.keys(roomGameState.turnScores ?? {}).length >= newGuessers + 1) {
         const newState: GameStateI = {
           ...roomGameState,
@@ -319,6 +385,7 @@ io.on('connection', (socket) => {
 
       selectedRoom.nextTurnInfo = { nextTurn, nextRound, nextDrawer, previousWords };
 
+      // Just remove the user from the game/room
       const newState: GameStateI = {
         ...roomGameState,
         usersGuessing: newGuessers
@@ -571,9 +638,6 @@ io.on('connection', (socket) => {
     // add the roomNumber to the room prop in users obj
     users[socket.id].room = roomNumber;
 
-    // notify all sockets in the room that a new user has joined
-    io.to(roomNumber.toString()).emit('user joined', { username });
-
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
       const roomOwner = selectedRoom.owner;
       const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
@@ -586,10 +650,10 @@ io.on('connection', (socket) => {
       msg: updateListMessage({ username, action: 'join' })
     });
     // TODO: send the gameState to the joined user from a no drawer
-    // TODO: send what has been drew until now
+    // TODO: send what has been drew until now (from drawer)
     // the joined user, in case that is not a preTurn, he shouldnt be able to draw and chat
 
-    // TODO: send a prop in thge join room response to let know the front if the game is in a turn being
+    // TODO: send a prop in the join room response to let know the front if the game is in a turn being
     // played, so he cant draw and chat. In the front, in the pre turn no drawer (maybe drawer aswell),
     // has to delete the state that blocks the user to draw and chat
 
