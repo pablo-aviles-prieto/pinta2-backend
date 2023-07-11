@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
     // Checks if the user joined a room
     if (roomNumber) {
       // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
-      // there shouldnt be nothing to handle in this case, but CHECK IT OUT!
+      // there shouldnt be nothing to handle in this case, but CHECK IT OUT
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -592,6 +592,7 @@ io.on('connection', (socket) => {
       console.log('Room already exists');
     } else {
       socket.join(roomNumber.toString());
+      // TODO: Add a color to the user (checking that no other user in the room, has that color)
       const roomUsers = [{ id: socket.id, name: users[socket.id].name }];
       rooms[roomNumber] = {
         owner: socket.id,
@@ -634,6 +635,7 @@ io.on('connection', (socket) => {
 
     const username = users[socket.id].name;
     // add the user to the room's users array
+    // TODO: Add a color to the user (checking that no other user in the room, has that color)
     selectedRoom.users.push({ id: socket.id, name: username });
     // add the roomNumber to the room prop in users obj
     users[socket.id].room = roomNumber;
@@ -644,25 +646,32 @@ io.on('connection', (socket) => {
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
     }
 
+    // TODO: Send the user (newUser prop) who has joined so he can be hydrated
     io.to(roomNumber.toString()).emit('update user list', {
       newUsers: selectedRoom.users,
       action: 'join',
       msg: updateListMessage({ username, action: 'join' })
     });
-    // TODO: send the gameState to the joined user from a no drawer
     // TODO: send what has been drew until now (from drawer)
-    // the joined user, in case that is not a preTurn, he shouldnt be able to draw and chat
+    // TODO: Add a color to the user in 'joined room' and 'create room' events
 
-    // TODO: send a prop in the join room response to let know the front if the game is in a turn being
-    // played, so he cant draw and chat. In the front, in the pre turn no drawer (maybe drawer aswell),
-    // has to delete the state that blocks the user to draw and chat
+    // ??TODO: Listen to the 'hydrate new user' event, where we get the turnCount, what has ben draw
+    // and newUser prop.
+    // Maybe the drawer can send the 'get game data' directly to the new user, and avoid a listener
+    // TODO: emit an event to that newUser called 'get game data', with the draw and turnCount
+
+    // TODO: send a prop (isPlaying) in 'join room response' so the joined user, save in a state that the
+    // turn is being played and he cant chat (already cant draw).
+    // At the start of every turn (after preTurn countdown of 3 secs), set to false that state in the front
 
     // respond to the joining socket with success
     socket.emit('join room response', {
       success: true,
       message: 'Successfully joined room',
       room: roomNumber,
-      newUsers: selectedRoom.users // Sending the updated userList to the user just joined the room
+      newUsers: selectedRoom.users, // Sending the updated userList to the user just joined the room
+      isPlaying: !selectedRoom.gameState.preTurn, // If its not in preTurn, the turn is being played
+      gameState: selectedRoom.gameState
     });
 
     console.dir(rooms, { depth: null });
