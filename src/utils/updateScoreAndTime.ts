@@ -6,7 +6,7 @@ interface UpdateScoreAndTimeI {
   firstGuesser: boolean;
 }
 
-// Always returning a whole number. Using Match.ceil in case of decimals
+// Always returning an absolute number. Using Match.ceil in case of decimals
 export const updateScoreAndTime = ({
   remainingTime,
   totalTime,

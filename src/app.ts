@@ -131,6 +131,10 @@ io.on('connection', (socket) => {
 
       const roomGameState = selectedRoom.gameState;
 
+      // TODO: Check if its neccessary the !preTurn (IF DRAWER LEAVES). Since in preTurn, it should stop
+      // the turn and pass to the next available user (if the game didnt finish), and update
+      // turn/round accordly
+
       // Checking if the user who left is the drawer and is not in preTurn
       if (selectedRoom.gameState.drawer?.id === socket.id && !selectedRoom.gameState.preTurn) {
         // If there are scores in turnScores, substract it on totalScores
@@ -636,7 +640,8 @@ io.on('connection', (socket) => {
     const username = users[socket.id].name;
     // add the user to the room's users array
     // TODO: Add a color to the user (checking that no other user in the room, has that color)
-    selectedRoom.users.push({ id: socket.id, name: username });
+    const newUser: UserI = { id: socket.id, name: username };
+    selectedRoom.users.push(newUser);
     // add the roomNumber to the room prop in users obj
     users[socket.id].room = roomNumber;
 
@@ -646,31 +651,31 @@ io.on('connection', (socket) => {
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
     }
 
-    // TODO: Send the user (newUser prop) who has joined so he can be hydrated
-    io.to(roomNumber.toString()).emit('update user list', {
-      newUsers: selectedRoom.users,
-      action: 'join',
-      msg: updateListMessage({ username, action: 'join' })
-    });
-    // TODO: send what has been drew until now (from drawer)
-    // TODO: Add a color to the user in 'joined room' and 'create room' events
-
-    // ??TODO: Listen to the 'hydrate new user' event, where we get the turnCount, what has ben draw
-    // and newUser prop.
-    // Maybe the drawer can send the 'get game data' directly to the new user, and avoid a listener
-    // TODO: emit an event to that newUser called 'get game data', with the draw and turnCount
-
-    // TODO: send a prop (isPlaying) in 'join room response' so the joined user, save in a state that the
-    // turn is being played and he cant chat (already cant draw).
-    // At the start of every turn (after preTurn countdown of 3 secs), set to false that state in the front
+    // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
+    if (selectedRoom.gameState.totalScores) {
+      selectedRoom.gameState.totalScores[socket.id] = {
+        name: username,
+        value: 0
+      };
+    }
 
     // respond to the joining socket with success
     socket.emit('join room response', {
       success: true,
       message: 'Successfully joined room',
       room: roomNumber,
-      newUsers: selectedRoom.users, // Sending the updated userList to the user just joined the room
-      isPlaying: !selectedRoom.gameState.preTurn, // If its not in preTurn, the turn is being played
+      // Sending the updated userList to the user just joined the room
+      newUsers: selectedRoom.users,
+      // If preTurn true, it means that the game is not being played
+      isPlaying: selectedRoom.gameState.preTurn !== undefined ? !selectedRoom.gameState.preTurn : false,
+      gameState: selectedRoom.gameState
+    });
+
+    io.to(roomNumber.toString()).emit('update user list', {
+      newUsers: selectedRoom.users,
+      action: 'join',
+      msg: updateListMessage({ username, action: 'join' }),
+      newUser,
       gameState: selectedRoom.gameState
     });
 
@@ -851,10 +856,15 @@ io.on('connection', (socket) => {
     io.to(selectedRoom.owner).emit('pre game owner', { categories, possibleTurnDurations });
   });
 
-  // TODO: When someone joins in the middle of a game. The crypted word should be sent
-  // TODO: If someone leaves or joins, has to modify the totalScores and probably turnScores
-  // TODO: Recieve an event to update the word with more letters to show (more hints)
+  socket.on(
+    'hydrate new player',
+    ({ newUser, turnCount, draw }: { newUser: UserI; turnCount: number | undefined; draw: LinesI[] }) => {
+      io.to(newUser.id).emit('current game data', { turnCount, draw });
+    }
+  );
 
+  // TODO: Create the possiblity to set a custom category with words from the front
+  // TODO: Recieve an event to update the word with more letters to show (more hints)
   // TODO: Create logic to modify in the config game, the max rounds to play
 });
 
