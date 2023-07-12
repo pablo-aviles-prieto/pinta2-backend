@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
 import {
   getCategoriesAndTurnDuration,
+  getUniqueColor,
   handleNextTurn,
   handleRemoveUser,
   handleRemoveUserOnRoom,
@@ -21,7 +22,10 @@ import {
   DEFAULT_CATEGORY_SELECTED,
   DEFAULT_MAX_ROUNDS,
   DEFAULT_POINTS_DRAWER,
-  DEFAULT_TURN_DURATION
+  DEFAULT_TURN_DURATION,
+  FALLBACK_USER_COLOR,
+  USER_LIGHT_COLORS
+  // USER_DARK_COLORS
 } from './utils/const';
 
 const { PORT } = process.env;
@@ -494,8 +498,9 @@ io.on('connection', (socket) => {
             };
           }
 
-          // TODO: Send to the guesser a notify to display in the front that he guessed it correctly!
-          // the rest of users will know since front already knows the score updated
+          socket.emit('user guessed', {
+            msg: `Felicidades ${users[socket.id].name}, acertaste`
+          });
 
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
@@ -566,7 +571,13 @@ io.on('connection', (socket) => {
         }
       }
       // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
-      io.to(roomNumber.toString()).emit('chat msg', { user: users[socket.id].name, msg });
+      const usersRoom = rooms[roomNumber].users;
+      io.to(roomNumber.toString()).emit('chat msg', {
+        user: users[socket.id].name,
+        msg,
+        id: socket.id,
+        color: usersRoom.find((user) => user.id === socket.id)?.color ?? FALLBACK_USER_COLOR
+      });
     }
   );
 
@@ -585,11 +596,10 @@ io.on('connection', (socket) => {
   socket.on('create room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (rooms[roomNumber]) {
       socket.emit('create room response', { success: false, message: 'Room already exists', room: roomNumber });
-      console.log('Room already exists');
     } else {
       socket.join(roomNumber.toString());
-      // TODO: Add a color to the user (checking that no other user in the room, has that color)!
-      const roomUsers = [{ id: socket.id, name: users[socket.id].name }];
+      const randomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: [] });
+      const roomUsers: UserI[] = [{ id: socket.id, name: users[socket.id].name, color: randomColor }];
       rooms[roomNumber] = {
         owner: socket.id,
         password: roomPassword,
@@ -631,8 +641,8 @@ io.on('connection', (socket) => {
 
     const username = users[socket.id].name;
     // add the user to the room's users array
-    // TODO: Add a color to the user (checking that no other user in the room, has that color)!
-    const newUser: UserI = { id: socket.id, name: username };
+    const getRandomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: selectedRoom.users });
+    const newUser: UserI = { id: socket.id, name: username, color: getRandomColor };
     selectedRoom.users.push(newUser);
     // add the roomNumber to the room prop in users obj
     users[socket.id].room = roomNumber;
