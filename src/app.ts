@@ -66,8 +66,6 @@ io.on('connection', (socket) => {
 
     // Checks if the user joined a room
     if (roomNumber) {
-      // TODO: Check if the user who disconnected, just joined and wasnt playing this turn
-      // there shouldnt be nothing to handle in this case, but CHECK IT OUT
       const selectedRoom = rooms[roomNumber];
 
       // If there are no more users in the room, delete the room, the user and return
@@ -99,10 +97,8 @@ io.on('connection', (socket) => {
 
       // checks if its in the endGame and who left was the owner
       if (selectedRoom.gameState.endGame && selectedRoom.owner === socket.id) {
-        // TODO: Send a 'resend game ended' so the front will update the setEndGameContent
         const newOwner = selectedRoom.users[1].id;
         io.to(roomNumber.toString()).emit('resend game ended', { owner: newOwner });
-        // for the new owner in case the owner leaves, and other user want to restart the game
       }
 
       // Not enough players on room, game cancelled
@@ -131,12 +127,8 @@ io.on('connection', (socket) => {
 
       const roomGameState = selectedRoom.gameState;
 
-      // TODO: Check if its neccessary the !preTurn (IF DRAWER LEAVES). Since in preTurn, it should stop
-      // the turn and pass to the next available user (if the game didnt finish), and update
-      // turn/round accordly
-
-      // Checking if the user who left is the drawer and is not in preTurn
-      if (selectedRoom.gameState.drawer?.id === socket.id && !selectedRoom.gameState.preTurn) {
+      // Checking if the user who left is the drawer and passing to next turn if proceeds
+      if (selectedRoom.gameState.drawer?.id === socket.id) {
         // If there are scores in turnScores, substract it on totalScores
         if (roomGameState.turnScores && roomGameState.totalScores) {
           for (const key in roomGameState.turnScores) {
@@ -596,7 +588,7 @@ io.on('connection', (socket) => {
       console.log('Room already exists');
     } else {
       socket.join(roomNumber.toString());
-      // TODO: Add a color to the user (checking that no other user in the room, has that color)
+      // TODO: Add a color to the user (checking that no other user in the room, has that color)!
       const roomUsers = [{ id: socket.id, name: users[socket.id].name }];
       rooms[roomNumber] = {
         owner: socket.id,
@@ -639,7 +631,7 @@ io.on('connection', (socket) => {
 
     const username = users[socket.id].name;
     // add the user to the room's users array
-    // TODO: Add a color to the user (checking that no other user in the room, has that color)
+    // TODO: Add a color to the user (checking that no other user in the room, has that color)!
     const newUser: UserI = { id: socket.id, name: username };
     selectedRoom.users.push(newUser);
     // add the roomNumber to the room prop in users obj
