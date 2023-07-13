@@ -505,7 +505,7 @@ io.on('connection', (socket) => {
           // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
             id: socket.id,
-            msg: `El usuario ${users[socket.id].name} acertó la palabra`,
+            msg: `${users[socket.id].name} acertó la palabra`,
             totalScores: totalScoresObj,
             turnScores: turnScoresObj,
             updatedTime: updatedScoreTime.updatedTime
@@ -595,7 +595,11 @@ io.on('connection', (socket) => {
 
   socket.on('create room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (rooms[roomNumber]) {
-      socket.emit('create room response', { success: false, message: 'Room already exists', room: roomNumber });
+      socket.emit('create room response', {
+        success: false,
+        message: `La sala ${roomNumber} ya existe. Prueba con otra!`,
+        room: roomNumber
+      });
     } else {
       socket.join(roomNumber.toString());
       const randomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: [] });
@@ -610,7 +614,7 @@ io.on('connection', (socket) => {
       users[socket.id].room = roomNumber;
       socket.emit('create room response', {
         success: true,
-        message: 'Room successfully created',
+        message: `Sala ${roomNumber} creada con éxito!`,
         room: roomNumber,
         roomUsers
       });
@@ -620,7 +624,11 @@ io.on('connection', (socket) => {
 
   socket.on('join room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (!rooms[roomNumber]) {
-      socket.emit('join room response', { success: false, message: 'Room does not exist', room: roomNumber });
+      socket.emit('join room response', {
+        success: false,
+        message: `La sala ${roomNumber} no existe!`,
+        room: roomNumber
+      });
       return;
     }
 
@@ -630,7 +638,7 @@ io.on('connection', (socket) => {
     if (!passwordMatches) {
       socket.emit('join room response', {
         success: false,
-        message: `Check the provided credentials`,
+        message: `Comprueba las credenciales e inténtalo nuevamente`,
         room: roomNumber
       });
       return;
@@ -664,7 +672,7 @@ io.on('connection', (socket) => {
     // respond to the joining socket with success
     socket.emit('join room response', {
       success: true,
-      message: 'Successfully joined room',
+      message: `Bienvenido ${username} a la sala ${roomNumber}`,
       room: roomNumber,
       // Sending the updated userList to the user just joined the room
       newUsers: selectedRoom.users,
