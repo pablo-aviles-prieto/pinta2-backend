@@ -3,7 +3,7 @@ import { FALLBACK_USER_COLOR } from './const';
 
 export const getUniqueColor = ({ colorArray, usersArray }: { colorArray: string[]; usersArray: UserI[] }): string => {
   // returning fallback grey color in case that there are more users that color availables
-  if (usersArray.length > colorArray.length) {
+  if (usersArray.length >= colorArray.length) {
     return FALLBACK_USER_COLOR;
   }
 
