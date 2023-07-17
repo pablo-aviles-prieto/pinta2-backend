@@ -66,9 +66,6 @@ io.on('connection', (socket) => {
   // TODO: There is a bug when a user joined the room, cant draw and chat, is not counting on usersGuessing
   // but when it leaves, it reduces the usersGuessing, and it shouldnt substract 1 to usersGuessing
   socket.on('disconnect', () => {
-    console.log('disconnect event');
-    console.log('socket', socket.id);
-    console.log('users', users);
     usersAmount--;
     const username = users[socket.id].name;
     const roomNumber = users[socket.id]?.room;
@@ -628,6 +625,7 @@ io.on('connection', (socket) => {
   });
 
   // TODO: check that the user is not already in the room (just in case)
+  // also check it on the 'join room directly' event
   socket.on('join room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (!rooms[roomNumber]) {
       socket.emit('join room response', {
@@ -908,6 +906,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  // TODO: Could refactor this logic with the 'join room' event logic
   socket.on('join room directly', ({ roomNumber, username }: { roomNumber: string; username: string }) => {
     // add the user to the users array
     usersAmount++;
