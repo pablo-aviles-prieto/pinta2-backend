@@ -63,7 +63,12 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
+  // TODO: There is a bug when a user joined the room, cant draw and chat, is not counting on usersGuessing
+  // but when it leaves, it reduces the usersGuessing, and it shouldnt substract 1 to usersGuessing
   socket.on('disconnect', () => {
+    console.log('disconnect event');
+    console.log('socket', socket.id);
+    console.log('users', users);
     usersAmount--;
     const username = users[socket.id].name;
     const roomNumber = users[socket.id]?.room;
@@ -622,6 +627,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // TODO: check that the user is not already in the room (just in case)
   socket.on('join room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (!rooms[roomNumber]) {
       socket.emit('join room response', {
@@ -869,12 +875,91 @@ io.on('connection', (socket) => {
   socket.on(
     'hydrate new player',
     ({ newUser, turnCount, draw }: { newUser: UserI; turnCount: number | undefined; draw: LinesI[] }) => {
-      io.to(newUser.id).emit('current game data', { turnCount, draw });
+      setTimeout(() => {
+        io.to(newUser.id).emit('current game data', { turnCount, draw });
+      }, 300);
+      // io.to(newUser.id).emit('current game data', { turnCount, draw });
     }
   );
 
-  // TODO: Create the possiblity to set a custom category with words from the front
+  socket.on('check room credentials', ({ roomNumber, roomPassword }: { roomNumber: string; roomPassword: string }) => {
+    if (!rooms[roomNumber]) {
+      socket.emit('check room credentials response', {
+        success: false,
+        message: `La sala ${roomNumber} no existe. Introduzca un usuario e intente acceder a la sala nuevamente`
+      });
+      return;
+    }
+
+    const selectedRoom = rooms[roomNumber];
+    const passwordMatches = selectedRoom.password === roomPassword;
+
+    if (!passwordMatches) {
+      socket.emit('check room credentials response', {
+        success: false,
+        message: `La contraseña de la sala ${roomNumber} no es correcta. Introduzca un usuario e intente acceder a la sala nuevamente`
+      });
+      return;
+    }
+
+    socket.emit('check room credentials response', {
+      success: true,
+      message: `Introduce un nombre para acceder a la sala ${roomNumber}`
+    });
+  });
+
+  socket.on('join room directly', ({ roomNumber, username }: { roomNumber: string; username: string }) => {
+    // add the user to the users array
+    usersAmount++;
+    users[socket.id] = { name: username, room: Number(roomNumber) };
+    console.info(`${username} connected // Total users => ${usersAmount}`);
+
+    // join the socket to the room
+    socket.join(roomNumber);
+
+    const selectedRoom = rooms[roomNumber];
+    const getRandomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: selectedRoom.users });
+    const newUser: UserI = { id: socket.id, name: username, color: getRandomColor };
+    // add the user to the room's users array
+    selectedRoom.users.push(newUser);
+
+    if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
+      const roomOwner = selectedRoom.owner;
+      const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
+      socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
+    }
+
+    // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
+    if (selectedRoom.gameState.totalScores) {
+      selectedRoom.gameState.totalScores[socket.id] = {
+        name: username,
+        value: 0
+      };
+    }
+
+    // respond to the joining socket with success
+    socket.emit('join room directly response', {
+      success: true,
+      // Sending the updated userList to the user just joined the room
+      newUsers: selectedRoom.users,
+      // If preTurn true, it means that the game is not being played
+      isPlaying: selectedRoom.gameState.preTurn !== undefined ? !selectedRoom.gameState.preTurn : false,
+      gameState: selectedRoom.gameState
+    });
+
+    io.to(roomNumber.toString()).emit('update user list', {
+      newUsers: selectedRoom.users,
+      action: 'join',
+      msg: updateListMessage({ username, action: 'join' }),
+      newUser,
+      gameState: selectedRoom.gameState
+    });
+
+    console.dir(rooms, { depth: null });
+  });
+
   // TODO: Recieve an event to update the word with more letters to show (more hints)
+  // TODO: Create the possiblity to set a custom category with words from the front
   // TODO: Create logic to modify in the config game, the max rounds to play
 });
 
