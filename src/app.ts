@@ -63,9 +63,14 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
-  // TODO: There is a bug when a user joined the room, cant draw and chat, is not counting on usersGuessing
-  // but when it leaves, it reduces the usersGuessing, and it shouldnt substract 1 to usersGuessing
+  // TODO: Check if the user go back and then fordward, to the page he left back. The server crash
+  // has to check first of all if the username exists: const username = users[socket.id].name;
   socket.on('disconnect', () => {
+    // checking that the user who left didnt register yet (it can happens if he tries to joins directly via url)
+    if (!users || !users[socket.id]) {
+      return;
+    }
+
     usersAmount--;
     const username = users[socket.id].name;
     const roomNumber = users[socket.id]?.room;
@@ -179,6 +184,27 @@ io.on('connection', (socket) => {
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
         } else {
           io.to(roomNumber.toString()).emit('show scoreboard');
+        }
+        handleRemoveUserOnRoom({
+          socket,
+          username,
+          users,
+          usersAmount,
+          userIndex,
+          selectedRoom,
+          roomNumber,
+          io,
+          isOwner
+        });
+        return;
+      }
+
+      // Checking if the user left in the same turn he joined into the room
+      if (selectedRoom.usersNotPlaying.includes(socket.id)) {
+        // deleting from turnScores the user
+        if (selectedRoom.gameState.totalScores && selectedRoom.gameState.totalScores[socket.id]) {
+          delete selectedRoom.gameState.totalScores[socket.id];
+          io.to(roomNumber.toString()).emit('update game state front', { gameState: selectedRoom.gameState });
         }
         handleRemoveUserOnRoom({
           socket,
@@ -611,7 +637,8 @@ io.on('connection', (socket) => {
         password: roomPassword,
         users: roomUsers,
         gameState: { started: false },
-        nextTurnInfo: undefined
+        nextTurnInfo: undefined,
+        usersNotPlaying: []
       };
       users[socket.id].room = roomNumber;
       socket.emit('create room response', {
@@ -772,6 +799,7 @@ io.on('connection', (socket) => {
 
     // init preTurn countdown on front
     io.to(roomNumber.toString()).emit('countdown preDraw start');
+    selectedRoom.usersNotPlaying = [];
   });
 
   socket.on('starting turn', ({ roomNumber }: { roomNumber: number }) => {
@@ -955,6 +983,12 @@ io.on('connection', (socket) => {
     });
 
     console.dir(rooms, { depth: null });
+  });
+
+  socket.on('update users not playing', ({ roomNumber }: { roomNumber: number | undefined }) => {
+    if (!roomNumber) return;
+    const selectedRoom = rooms[roomNumber];
+    selectedRoom.usersNotPlaying.push(socket.id);
   });
 
   // TODO: Recieve an event to update the word with more letters to show (more hints)

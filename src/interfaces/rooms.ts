@@ -42,4 +42,5 @@ export interface RoomsI {
   users: UserI[];
   gameState: GameStateI;
   nextTurnInfo: NextTurnInfoI | undefined;
+  usersNotPlaying: string[]; // storing the users that joined while turn in progress
 }
