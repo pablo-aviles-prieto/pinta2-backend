@@ -900,11 +900,21 @@ io.on('connection', (socket) => {
 
   socket.on(
     'hydrate new player',
-    ({ newUser, turnCount, draw }: { newUser: UserI; turnCount: number | undefined; draw: LinesI[] }) => {
+    ({
+      newUser,
+      turnCount,
+      draw,
+      roomNumber
+    }: {
+      newUser: UserI;
+      turnCount: number | undefined;
+      draw: LinesI[];
+      roomNumber: number | undefined;
+    }) => {
+      const selectedRoom = rooms[roomNumber ?? 0];
       setTimeout(() => {
-        io.to(newUser.id).emit('current game data', { turnCount, draw });
+        io.to(newUser.id).emit('current game data', { turnCount, draw, usersNotPlaying: selectedRoom.usersNotPlaying });
       }, 300);
-      // io.to(newUser.id).emit('current game data', { turnCount, draw });
     }
   );
 

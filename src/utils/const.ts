@@ -30,7 +30,7 @@ export const USER_DARK_COLORS = [
 export const USER_LIGHT_COLORS = [
   '#4C6E91', // light dark blue
   '#AA4647', // light dark red
-  '#57A773', // light dark green
+  '#57A773', // light dark green => TODO: Change along lime
   '#C9A567', // light dark yellow
   '#5E7D8C', // light dark sky blue
   '#4B77A1', // light dark navy
@@ -39,7 +39,7 @@ export const USER_LIGHT_COLORS = [
   '#8465A1', // light dark purple
   '#5B96B1', // light dark teal
   '#B2625D', // light dark crimson
-  '#58A778', // light dark lime
+  '#58A778', // light dark lime => TODO: Change along green
   '#868F8F', // light dark gray
   '#9E6AB5', // light dark violet
   '#465466', // light dark blue
