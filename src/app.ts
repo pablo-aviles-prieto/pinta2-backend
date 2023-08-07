@@ -622,6 +622,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('create room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
+    if (roomNumber === 0) {
+      socket.emit('create room response', {
+        success: false,
+        message: `Número de sala invalido. Prueba con otra!`,
+        room: roomNumber
+      });
+      return;
+    }
     if (rooms[roomNumber]) {
       socket.emit('create room response', {
         success: false,
@@ -1002,9 +1010,17 @@ io.on('connection', (socket) => {
   });
 
   socket.on('update drawing lines', ({ roomNumber, draw }: { roomNumber: number | undefined; draw: LinesI[] }) => {
-    console.log('roomNumber', roomNumber);
     if (!roomNumber) return;
     socket.to(roomNumber.toString()).emit('update lines state', { lines: draw });
+  });
+
+  // No need to check if there are 3 users, since this event is triggered from the front when they're more than 2 users
+  socket.on('send pre game', ({ roomNumber }: { roomNumber: number | undefined }) => {
+    if (!roomNumber) return;
+    const selectedRoom = rooms[roomNumber];
+    const roomOwner = selectedRoom.owner;
+    const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
+    io.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
   });
 
   // TODO: Recieve an event to update the word with more letters to show (more hints)
