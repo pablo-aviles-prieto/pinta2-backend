@@ -1001,6 +1001,12 @@ io.on('connection', (socket) => {
     selectedRoom.usersNotPlaying.push(socket.id);
   });
 
+  socket.on('update drawing lines', ({ roomNumber, draw }: { roomNumber: number | undefined; draw: LinesI[] }) => {
+    console.log('roomNumber', roomNumber);
+    if (!roomNumber) return;
+    socket.to(roomNumber.toString()).emit('update lines state', { lines: draw });
+  });
+
   // TODO: Recieve an event to update the word with more letters to show (more hints)
   // TODO: Create the possiblity to set a custom category with words from the front
   // TODO: Create logic to modify in the config game, the max rounds to play
