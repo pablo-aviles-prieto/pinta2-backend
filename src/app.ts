@@ -28,7 +28,7 @@ import {
   // USER_DARK_COLORS
 } from './utils/const';
 
-const { PORT } = process.env;
+const { PORT, FORMSPREE_ID } = process.env;
 
 const app = express();
 
@@ -1022,6 +1022,44 @@ io.on('connection', (socket) => {
     const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
     io.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
   });
+
+  socket.on(
+    'submit contact form',
+    async (
+      formData: {
+        from: string;
+        name: string;
+        contactType: string;
+        contactInfo: string;
+        message: string;
+      },
+      callback: (response: { success: boolean; message: string }) => void
+    ) => {
+      if (Object.values(formData).some((data) => !data)) {
+        callback({ success: false, message: 'Es necesario rellenar todos los datos' });
+        return;
+      }
+      try {
+        const response = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        if (response.status === 200) {
+          callback({ success: true, message: 'Su mensaje ha sido enviado. Le contactaremos lo antes posible! 🥰' });
+        } else {
+          const errorData = await response.json();
+          errorData?.error && console.error('Formspree ERROR =>', errorData.error);
+          callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
+        }
+      } catch (error) {
+        console.error('Formspree ERROR =>', error);
+        callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
+      }
+    }
+  );
 
   // TODO: Recieve an event to update the word with more letters to show (more hints)
   // TODO: Create the possiblity to set a custom category with words from the front
