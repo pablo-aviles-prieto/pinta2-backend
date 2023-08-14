@@ -5,6 +5,7 @@ import http from 'http';
 import cors from 'cors';
 import express from 'express';
 import path from 'path';
+import fetch from 'node-fetch';
 import { Server } from 'socket.io';
 import { GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
 import {
@@ -25,10 +26,10 @@ import {
   DEFAULT_TURN_DURATION,
   FALLBACK_USER_COLOR,
   USER_LIGHT_COLORS
-  // USER_DARK_COLORS
+  // USER_DARK_COLORS // TODO: Delete the dark colors
 } from './utils/const';
 
-const { PORT, FORMSPREE_ID } = process.env;
+const { PORT, FORMSPREE_ID, FRONT_ADDRESS } = process.env;
 
 const app = express();
 
@@ -41,7 +42,7 @@ const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:5173'
+    origin: FRONT_ADDRESS
   }
 });
 
@@ -1051,11 +1052,11 @@ io.on('connection', (socket) => {
           callback({ success: true, message: 'Su mensaje ha sido enviado. Le contactaremos lo antes posible! 🥰' });
         } else {
           const errorData = await response.json();
-          errorData?.error && console.error('Formspree ERROR =>', errorData.error);
+          console.log('Formspree errorData =>', errorData);
           callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
         }
       } catch (error) {
-        console.error('Formspree ERROR =>', error);
+        console.log('Formspree error =>', error);
         callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
       }
     }
