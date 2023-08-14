@@ -5,15 +5,15 @@ import http from 'http';
 import cors from 'cors';
 import express from 'express';
 import path from 'path';
-import fetch from 'node-fetch';
 import { Server } from 'socket.io';
-import { GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
+import { ContactForm, GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
 import {
   getCategoriesAndTurnDuration,
   getUniqueColor,
   handleNextTurn,
   handleRemoveUser,
   handleRemoveUserOnRoom,
+  handleSendMail,
   obscureString,
   shuffleArray,
   updateListMessage,
@@ -1026,37 +1026,21 @@ io.on('connection', (socket) => {
 
   socket.on(
     'submit contact form',
-    async (
-      formData: {
-        from: string;
-        name: string;
-        contactType: string;
-        contactInfo: string;
-        message: string;
-      },
-      callback: (response: { success: boolean; message: string }) => void
-    ) => {
+    async (formData: ContactForm, callback: (response: { success: boolean; message: string }) => void) => {
       if (Object.values(formData).some((data) => !data)) {
         callback({ success: false, message: 'Es necesario rellenar todos los datos' });
         return;
       }
       try {
-        const response = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        if (response.status === 200) {
+        const response = await handleSendMail(formData);
+        if (response[0].statusCode >= 200 && response[0].statusCode < 300) {
           callback({ success: true, message: 'Su mensaje ha sido enviado. Le contactaremos lo antes posible! 🥰' });
         } else {
-          const errorData = await response.json();
-          console.log('Formspree errorData =>', errorData);
+          console.log('Contact form ERROR =>', `Status code: ${response[0].statusCode} - Body: ${response[0].body}`);
           callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
         }
       } catch (error) {
-        console.log('Formspree error =>', error);
+        console.log('Contact form ERROR =>', error);
         callback({ success: false, message: 'Hubo un error enviando el mensaje. Inténtelo más tarde.' });
       }
     }
