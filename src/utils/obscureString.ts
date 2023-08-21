@@ -10,7 +10,7 @@ export const obscureString = (str: string) => {
     }
   }
 
-  if (nonSpaceIndices.length > 10) {
+  if (nonSpaceIndices.length >= 17) {
     const randomIndex = nonSpaceIndices[Math.floor(Math.random() * nonSpaceIndices.length)];
     array[randomIndex] = str[randomIndex];
   }

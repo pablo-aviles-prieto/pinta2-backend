@@ -8,6 +8,7 @@ import path from 'path';
 import { Server } from 'socket.io';
 import { ContactForm, GameStateI, LinesI, RoomsI, UserI, UsersI } from './interfaces';
 import {
+  checkCurrentWordStatus,
   getCategoriesAndTurnDuration,
   getUniqueColor,
   handleNextTurn,
@@ -16,6 +17,7 @@ import {
   handleSendMail,
   obscureString,
   shuffleArray,
+  unCryptRandomCharacter,
   updateListMessage,
   updateScoreAndTime
 } from './utils';
@@ -47,7 +49,6 @@ const io = new Server(httpServer, {
 });
 
 let usersAmount = 0;
-// Save an array of users with the socket.id, username and assigned color for chat?
 const users: { [key: string]: UsersI } = {}; // stored the socket.id as key
 const rooms: { [key: string]: RoomsI } = {}; // stored the roomNumber as key
 
@@ -64,8 +65,7 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
-  // TODO: Check if the user go back and then fordward, to the page he left back. The server crash
-  // has to check first of all if the username exists: const username = users[socket.id].name;
+  // TODO: Check if the user go back and then fordward, to the page he left back.
   socket.on('disconnect', () => {
     // checking that the user who left didnt register yet (it can happens if he tries to joins directly via url)
     if (!users || !users[socket.id]) {
@@ -1046,9 +1046,47 @@ io.on('connection', (socket) => {
     }
   );
 
+  socket.on(
+    'check for clues',
+    ({ roomNumber, percentageRemaining }: { roomNumber: number | undefined; percentageRemaining: number }) => {
+      if (!roomNumber) return;
+      const selectedRoom = rooms[roomNumber];
+
+      // When its 75% remaining, has 1 char or less crypted and the wordLength is >= 15, give 1 clue
+      const { wordLength, revealedLettersCount } = checkCurrentWordStatus(selectedRoom.gameState.cryptedWord ?? '');
+      const sendNewCryptedWord = (gameState: GameStateI) => {
+        io.to(roomNumber.toString()).emit('update game state front', { gameState });
+      };
+
+      const condition75Percent = percentageRemaining === 75 && wordLength >= 14 && revealedLettersCount < 1;
+      const condition50Percent =
+        percentageRemaining === 50 &&
+        ((wordLength >= 14 && revealedLettersCount < 2) || (wordLength >= 10 && revealedLettersCount < 1));
+      const condition25Percent =
+        percentageRemaining === 25 &&
+        ((wordLength >= 14 && revealedLettersCount < 3) || (wordLength >= 8 && revealedLettersCount < 2));
+
+      if (condition75Percent || condition50Percent || condition25Percent) {
+        const newCryptedWord = unCryptRandomCharacter({
+          cryptedWord: selectedRoom.gameState.cryptedWord ?? '',
+          unCryptedWord: selectedRoom.gameState.currentWord ?? ''
+        });
+        const newGameState: GameStateI = {
+          ...selectedRoom.gameState,
+          cryptedWord: newCryptedWord
+        };
+        selectedRoom.gameState = newGameState;
+        sendNewCryptedWord(newGameState);
+      }
+    }
+  );
+
   // TODO: Recieve an event to update the word with more letters to show (more hints)
   // TODO: Create the possiblity to set a custom category with words from the front
   // TODO: Create logic to modify in the config game, the max rounds to play
+  // TODO: Improve the words from the current categories and add some new categories
+  // TODO: Remove console logs for prod
+  // TODO: Remove getUnusedWord function since its not used ? Already using the shuffleArray helper
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));

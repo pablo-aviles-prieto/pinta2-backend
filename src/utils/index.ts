@@ -11,3 +11,5 @@ export { handleRemoveUser, handleRemoveUserOnRoom } from './handleRemoveUser';
 export { updateListMessage } from './updateListMessage';
 export { getUniqueColor } from './getUniqueColor';
 export { handleSendMail } from './handleSendMail';
+export { checkCurrentWordStatus } from './checkCurrentWordStatus';
+export { unCryptRandomCharacter } from './unCryptRandomCharacter';
