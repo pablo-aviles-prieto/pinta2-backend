@@ -699,6 +699,11 @@ io.on('connection', (socket) => {
       const roomOwner = selectedRoom.owner;
       const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
+      selectedRoom.users.forEach((user) => {
+        if (user.id !== roomOwner) {
+          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+        }
+      });
     }
 
     // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
@@ -905,6 +910,11 @@ io.on('connection', (socket) => {
     io.to(roomNumber.toString()).emit('close endgame modal');
     io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
     io.to(selectedRoom.owner).emit('pre game owner', { categories, possibleTurnDurations });
+    selectedRoom.users.forEach((user) => {
+      if (user.id !== selectedRoom.owner) {
+        io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+      }
+    });
   });
 
   socket.on(
@@ -973,6 +983,11 @@ io.on('connection', (socket) => {
       const roomOwner = selectedRoom.owner;
       const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
+      selectedRoom.users.forEach((user) => {
+        if (user.id !== roomOwner) {
+          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+        }
+      });
     }
 
     // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
@@ -1022,6 +1037,11 @@ io.on('connection', (socket) => {
     const roomOwner = selectedRoom.owner;
     const { categories, possibleTurnDurations } = getCategoriesAndTurnDuration();
     io.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
+    selectedRoom.users.forEach((user) => {
+      if (user.id !== roomOwner) {
+        io.to(user.id).emit('pre game no owner', { message: 'El anfitrión/a está configurando la partida...' });
+      }
+    });
   });
 
   socket.on(
