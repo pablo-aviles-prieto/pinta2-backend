@@ -701,7 +701,7 @@ io.on('connection', (socket) => {
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
       selectedRoom.users.forEach((user) => {
         if (user.id !== roomOwner) {
-          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión/a está configurando la partida...' });
         }
       });
     }
@@ -748,16 +748,26 @@ io.on('connection', (socket) => {
     ({
       roomNumber,
       turnDuration,
-      categorySelected
+      categorySelected,
+      customWords
     }: {
       roomNumber: number;
       turnDuration?: number | null;
       categorySelected?: string;
+      customWords?: string[];
     }) => {
       const selectedRoom = rooms[roomNumber];
-      const selectedCategory = categorySelected || selectedRoom.gameState.category || DEFAULT_CATEGORY_SELECTED;
+      let selectedCategory: string;
+      let shuffledArray: string[];
+      if (customWords && customWords.length < selectedRoom.users.length * 3 * 2) return;
+      if (customWords) {
+        selectedCategory = 'Personalizada';
+        shuffledArray = [...shuffleArray(customWords), ...words.Aleatorio];
+      } else {
+        selectedCategory = categorySelected || selectedRoom.gameState.category || DEFAULT_CATEGORY_SELECTED;
+        shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
+      }
       const selectedTurnDuration = turnDuration || selectedRoom.gameState.turnDuration || DEFAULT_TURN_DURATION;
-      const shuffledArray = shuffleArray(words[selectedCategory as keyof typeof words]);
 
       const scores = selectedRoom.users.reduce((acc: Record<string, { name: string; value: number }>, user) => {
         acc[user.id] = { name: user.name, value: 0 };
@@ -912,7 +922,7 @@ io.on('connection', (socket) => {
     io.to(selectedRoom.owner).emit('pre game owner', { categories, possibleTurnDurations });
     selectedRoom.users.forEach((user) => {
       if (user.id !== selectedRoom.owner) {
-        io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+        io.to(user.id).emit('pre game no owner', { message: 'El anfitrión/a está configurando la partida...' });
       }
     });
   });
@@ -985,7 +995,7 @@ io.on('connection', (socket) => {
       socket.to(roomOwner).emit('pre game owner', { categories, possibleTurnDurations });
       selectedRoom.users.forEach((user) => {
         if (user.id !== roomOwner) {
-          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión está configurando la partida...' });
+          io.to(user.id).emit('pre game no owner', { message: 'El anfitrión/a está configurando la partida...' });
         }
       });
     }
@@ -1101,8 +1111,6 @@ io.on('connection', (socket) => {
     }
   );
 
-  // TODO: Recieve an event to update the word with more letters to show (more hints)
-  // TODO: Create the possiblity to set a custom category with words from the front
   // TODO: Create logic to modify in the config game, the max rounds to play
   // TODO: Improve the words from the current categories and add some new categories
   // TODO: Remove console logs for prod
