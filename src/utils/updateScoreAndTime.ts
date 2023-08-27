@@ -13,7 +13,7 @@ export const updateScoreAndTime = ({
   firstGuesser
 }: UpdateScoreAndTimeI): { score: number; updatedTime: number } => {
   const timeRemainingPercentage = getRemaniningPercentageTime({ remainingTime, totalTime });
-  const subtractAmount = totalTime === 180 ? 15 : totalTime === 120 ? 10 : 5;
+  const subtractAmount = totalTime === 150 ? 15 : totalTime === 120 ? 10 : 5;
   if (timeRemainingPercentage > 50) {
     const halfTime = totalTime / 2;
     const updatedTime = Math.ceil(halfTime);
