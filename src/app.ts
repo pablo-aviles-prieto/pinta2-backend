@@ -31,7 +31,7 @@ import {
   // USER_DARK_COLORS // TODO: Delete the dark colors
 } from './utils/const';
 
-const { PORT, FORMSPREE_ID, FRONT_ADDRESS } = process.env;
+const { PORT, FRONT_ADDRESS, FRONT_ADDRESS2 } = process.env;
 
 const app = express();
 
@@ -42,9 +42,13 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 const httpServer = http.createServer(app);
 
+if (!FRONT_ADDRESS || !FRONT_ADDRESS2) {
+  throw new Error('Environment variables FRONT_ADDRESS and FRONT_ADDRESS2 must be defined.');
+}
+
 const io = new Server(httpServer, {
   cors: {
-    origin: FRONT_ADDRESS
+    origin: [FRONT_ADDRESS, FRONT_ADDRESS2]
   }
 });
 
