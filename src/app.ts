@@ -28,7 +28,6 @@ import {
   DEFAULT_TURN_DURATION,
   FALLBACK_USER_COLOR,
   USER_LIGHT_COLORS
-  // USER_DARK_COLORS // TODO: Delete the dark colors
 } from './utils/const';
 
 const { PORT, FRONT_ADDRESS, FRONT_ADDRESS2 } = process.env;
@@ -53,15 +52,9 @@ const io = new Server(httpServer, {
 });
 
 let usersAmount = 0;
-const users: { [key: string]: UsersI } = {}; // stored the socket.id as key
-const rooms: { [key: string]: RoomsI } = {}; // stored the roomNumber as key
+const users: { [key: string]: UsersI } = {};
+const rooms: { [key: string]: RoomsI } = {};
 
-// socket.emit => sends a message to the socket connection (client) that we're currently dealing with
-// io.emit => sends a message to all connected sockets (clients)
-// socket.broadcast.emit => sends a message to all connected sockets (clients), except for the one that we're currently dealing with
-// ROOMS:
-// socket.to(room).emit sends a message to all clients in the specified room except for the client on which socket is called (except to the user that init the event).
-// io.to(room).emit sends a message to all clients in the specified room.
 io.on('connection', (socket) => {
   socket.on('register', (username) => {
     usersAmount++;
@@ -69,9 +62,7 @@ io.on('connection', (socket) => {
     console.info(`${username} connected // Total users => ${usersAmount}`);
   });
 
-  // TODO: Check if the user go back and then fordward, to the page he left back.
   socket.on('disconnect', () => {
-    // checking that the user who left didnt register yet (it can happens if he tries to joins directly via url)
     if (!users || !users[socket.id]) {
       return;
     }
@@ -80,11 +71,9 @@ io.on('connection', (socket) => {
     const username = users[socket.id].name;
     const roomNumber = users[socket.id]?.room;
 
-    // Checks if the user joined a room
     if (roomNumber) {
       const selectedRoom = rooms[roomNumber];
 
-      // If there are no more users in the room, delete the room, the user and return
       if (selectedRoom.users.length <= 1) {
         delete rooms[roomNumber];
         console.info(`Last user (${username}) left the room ${roomNumber}, deleted room!`);
@@ -95,7 +84,6 @@ io.on('connection', (socket) => {
       const userIndex = selectedRoom.users.findIndex((user) => user.id === socket.id);
       const isOwner = selectedRoom.owner === socket.id;
 
-      // if the game didnt start yet, just update the user list
       if (!selectedRoom.gameState.started) {
         handleRemoveUserOnRoom({
           socket,
@@ -111,14 +99,11 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // checks if its in the endGame and who left was the owner
       if (selectedRoom.gameState.endGame && selectedRoom.owner === socket.id) {
         const newOwner = selectedRoom.users[1].id;
         io.to(roomNumber.toString()).emit('resend game ended', { owner: newOwner });
       }
 
-      // Not enough players on room, game cancelled
-      // checking if its lesser or equal than 3 since the user is not deleted yet from the obj
       if (selectedRoom.users.length <= 3) {
         const newState = { started: false };
         selectedRoom.gameState = newState;
@@ -143,9 +128,7 @@ io.on('connection', (socket) => {
 
       const roomGameState = selectedRoom.gameState;
 
-      // Checking if the user who left is the drawer and passing to next turn if proceeds
       if (selectedRoom.gameState.drawer?.id === socket.id) {
-        // If there are scores in turnScores, substract it on totalScores
         if (roomGameState.turnScores && roomGameState.totalScores) {
           for (const key in roomGameState.turnScores) {
             if (roomGameState.totalScores.hasOwnProperty(key)) {
@@ -155,16 +138,11 @@ io.on('connection', (socket) => {
         }
 
         const wasLastTurn = userIndex >= Object.keys(selectedRoom.users).length - 1;
-        // updating the next round if necessary
         const nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round ? roomGameState.round + 1 : 1;
-        // updating the next turn. If its not the last index the drawer, we just assign the same turn,
-        // since the drawer will be removed from the users array
         const nextTurn = !wasLastTurn ? roomGameState.turn : 0;
-        // If its not the last turn, we get the next user and assign it
         const nextDrawer = wasLastTurn ? selectedRoom.users[0] : selectedRoom.users[userIndex + 1];
         const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
 
-        // Remove the user from the totalScores object if exists (being drawer)
         if (roomGameState.totalScores?.hasOwnProperty(socket.id)) {
           delete roomGameState.totalScores[socket.id];
         }
@@ -180,10 +158,7 @@ io.on('connection', (socket) => {
         selectedRoom.gameState = newState;
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
 
-        // Checks if this was the last turn of last round (being drawer)
         if ((nextRound ?? 0) > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
-          // If the drawer is the owner, we pass the owner to the next user
-          // since the owner is the index 0 in the selectedRoom users array
           const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
           selectedRoom.gameState.endGame = true;
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
@@ -204,9 +179,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Checking if the user left in the same turn he joined into the room
       if (selectedRoom.usersNotPlaying.includes(socket.id)) {
-        // deleting from turnScores the user
         if (selectedRoom.gameState.totalScores && selectedRoom.gameState.totalScores[socket.id]) {
           delete selectedRoom.gameState.totalScores[socket.id];
           io.to(roomNumber.toString()).emit('update game state front', { gameState: selectedRoom.gameState });
@@ -227,7 +200,6 @@ io.on('connection', (socket) => {
 
       const newGuessers = (roomGameState.usersGuessing ?? 2) - 1;
 
-      // Removing from turnScores and totalScores in case that the user scored this turn
       if (
         roomGameState.turnScores &&
         roomGameState.totalScores &&
@@ -237,7 +209,6 @@ io.on('connection', (socket) => {
       ) {
         delete roomGameState.totalScores[socket.id];
         delete roomGameState.turnScores[socket.id];
-        // substract to the drawer the points from this user
         if (
           roomGameState.drawer?.id &&
           roomGameState.turnScores[roomGameState.drawer.id] &&
@@ -247,13 +218,11 @@ io.on('connection', (socket) => {
           roomGameState.totalScores[roomGameState.drawer.id].value -= DEFAULT_POINTS_DRAWER;
         }
 
-        // updating the score states and the usersGuessing
         const newState: GameStateI = { ...roomGameState, usersGuessing: newGuessers };
         selectedRoom.gameState = newState;
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
       }
 
-      // Removing from totalScores if the user didnt score in this turn (being no drawer)
       if (
         roomGameState.totalScores &&
         roomGameState.totalScores[socket.id] &&
@@ -268,17 +237,13 @@ io.on('connection', (socket) => {
 
       const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id ?? '');
 
-      // If its in preTurn, it just remove the user, and handle edge cases on drawer
       if (selectedRoom.gameState.preTurn) {
-        // Remove the user from the totalScores object (doesnt match the if condition in previous blocks)
         if (roomGameState.totalScores && roomGameState.totalScores[socket.id]) {
           delete roomGameState.totalScores[socket.id];
         }
 
-        // In preTurn, the drawer, round, turn and previousWords has been updated for next turn
         let newState: GameStateI = { ...roomGameState, usersGuessing: newGuessers };
         if (selectedRoom.gameState.drawer?.id === socket.id) {
-          // Checking if the drawer is the next last turn and if it resets to a new round
           if (drawerIndex >= Object.keys(selectedRoom.users).length - 1) {
             const nextRound = (roomGameState.round ?? 1) + 1;
             newState = {
@@ -288,10 +253,8 @@ io.on('connection', (socket) => {
               turn: 0,
               round: nextRound
             };
-            // Checks if this was the last turn of the last round
             if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
               io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
-              // If the user who left is the owner, we pass the owner to the next user
               const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
               selectedRoom.gameState.endGame = true;
               io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
@@ -317,7 +280,6 @@ io.on('connection', (socket) => {
           }
         }
 
-        // checking if the user who left, already drew in the current round
         if (userIndex < drawerIndex) {
           newState = {
             ...roomGameState,
@@ -347,7 +309,6 @@ io.on('connection', (socket) => {
       let nextDrawer: UserI;
       const previousWords = roomGameState.previousWords ? roomGameState.previousWords + 3 : 3;
 
-      // checking if the user who left, already drew in the current round
       if (userIndex < drawerIndex) {
         if (roomGameState.turn === undefined || roomGameState.round === undefined) return;
         const wasLastTurn = drawerIndex >= Object.keys(selectedRoom.users).length - 1;
@@ -355,7 +316,6 @@ io.on('connection', (socket) => {
         nextRound = !wasLastTurn ? roomGameState.round : roomGameState.round + 1;
         nextDrawer = selectedRoom.users[drawerIndex + 1];
         if (wasLastTurn) {
-          // checking if the user leaving is the 1st, so we assign the drawer to the 2nd user
           nextDrawer = userIndex === 0 ? selectedRoom.users[1] : selectedRoom.users[0];
         }
       } else {
@@ -366,20 +326,15 @@ io.on('connection', (socket) => {
         nextRound = roomGameState.round;
         nextDrawer = selectedRoom.users[drawerIndex + 1];
         if (userIsNextToDrawer && !userWasLast) {
-          // bypassing the user since is leaving, and we know there is more users after the user leaving
           nextDrawer = selectedRoom.users[drawerIndex + 2];
         }
         if (userWasLast && userIsNextToDrawer) {
-          // isLastTurn => reset the round/turn cycle
           nextTurn = 0;
           nextRound = roomGameState.round + 1;
           nextDrawer = selectedRoom.users[0];
         }
       }
 
-      // Checking if the user was the last one remaining to guess the word.
-      // Adding 1 to newGuessers because the drawer counts
-      // Also checking for !preTurn, since the score is not updated in preTurn
       if (Object.keys(roomGameState.turnScores ?? {}).length >= newGuessers + 1) {
         const newState: GameStateI = {
           ...roomGameState,
@@ -392,10 +347,7 @@ io.on('connection', (socket) => {
         };
         selectedRoom.gameState = newState;
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
-        // Checks if this was the last turn of last round
         if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
-          // If the user who left is the owner, we pass the owner to the next user
-          // since the owner is the index 0 in the selectedRoom users array
           const newOwner = isOwner ? selectedRoom.users[1].id : selectedRoom.owner;
           selectedRoom.gameState.endGame = true;
           io.to(roomNumber.toString()).emit('game ended', { owner: newOwner });
@@ -418,7 +370,6 @@ io.on('connection', (socket) => {
 
       selectedRoom.nextTurnInfo = { nextTurn, nextRound, nextDrawer, previousWords };
 
-      // Just remove the user from the game/room
       const newState: GameStateI = {
         ...roomGameState,
         usersGuessing: newGuessers
@@ -437,7 +388,6 @@ io.on('connection', (socket) => {
         io,
         isOwner
       });
-      console.dir(rooms, { depth: null });
       return;
     }
 
@@ -450,12 +400,10 @@ io.on('connection', (socket) => {
       const roomGameState = rooms[roomNumber].gameState;
 
       if (turnCount && roomGameState.started && !roomGameState.preTurn && roomGameState.currentWord) {
-        // If the msg is from the drawer while in his turn, return without sending
         if (roomGameState.drawer?.id === socket.id) {
           return;
         }
 
-        // User guessed the word
         if (roomGameState.currentWord.toLowerCase() === msg.toLowerCase()) {
           const turnScoresObj = roomGameState.turnScores;
           const totalScoresObj = roomGameState.totalScores;
@@ -467,37 +415,31 @@ io.on('connection', (socket) => {
             firstGuesser: isFirstGuesser
           });
 
-          // Checks if the user already guessed (in case front dont handle it correctly)
           if (turnScoresObj && turnScoresObj[socket.id]) {
             return;
           }
 
-          // creating the totalScoresObj if didnt exist
           if (!totalScoresObj) {
             roomGameState.totalScores = {};
           }
-          // updating totalScoresObj, in case that the guesser already scored
           if (totalScoresObj && totalScoresObj[socket.id]) {
             totalScoresObj[socket.id] = {
               ...totalScoresObj[socket.id],
               value: totalScoresObj[socket.id].value + updatedScoreTime.score
             };
           }
-          // updating totalScoresObj, in case that the drawer already scored
           if (totalScoresObj && drawerId && totalScoresObj[drawerId]) {
             totalScoresObj[drawerId] = {
               ...totalScoresObj[drawerId],
               value: totalScoresObj[drawerId].value + DEFAULT_POINTS_DRAWER
             };
           }
-          // updating totalScoresObj, if its the first time for the guesser
           if (totalScoresObj && !totalScoresObj[socket.id]) {
             totalScoresObj[socket.id] = {
               name: users[socket.id].name,
               value: updatedScoreTime.score
             };
           }
-          // updating totalScoresObj, if its the first time for the drawer
           if (totalScoresObj && drawerId && !totalScoresObj[drawerId]) {
             totalScoresObj[drawerId] = {
               name: users[drawerId].name,
@@ -505,25 +447,21 @@ io.on('connection', (socket) => {
             };
           }
 
-          // creating the turnScoresObj if didnt exist
           if (!turnScoresObj) {
             roomGameState.turnScores = {};
           }
-          // updating turnScoresObj for the guesser, cant be already created
           if (turnScoresObj && !turnScoresObj[socket.id]) {
             turnScoresObj[socket.id] = {
               name: users[socket.id].name,
               value: updatedScoreTime.score
             };
           }
-          // updating turnScoresObj for the drawer, if already scored
           if (turnScoresObj && drawerId && turnScoresObj[drawerId]) {
             turnScoresObj[drawerId] = {
               ...turnScoresObj[drawerId],
               value: turnScoresObj[drawerId].value + DEFAULT_POINTS_DRAWER
             };
           }
-          // updating turnScoresObj, if its the first time for the drawer
           if (turnScoresObj && drawerId && !turnScoresObj[drawerId]) {
             turnScoresObj[drawerId] = {
               name: users[drawerId].name,
@@ -535,7 +473,6 @@ io.on('connection', (socket) => {
             msg: `Felicidades ${users[socket.id].name}, acertaste`
           });
 
-          // Sending the updated scores
           io.to(roomNumber.toString()).emit('guessed word', {
             id: socket.id,
             msg: `${users[socket.id].name} acertó la palabra`,
@@ -544,8 +481,6 @@ io.on('connection', (socket) => {
             updatedTime: updatedScoreTime.updatedTime
           });
 
-          // Checks if its the last guesser. Fallback of 2 users as default
-          // Adding 1 to usersGuessing since the drawer will get points aswell
           if (
             Object.keys(roomGameState.turnScores ?? {}).length >=
             (roomGameState.usersGuessing ? roomGameState.usersGuessing + 1 : 2)
@@ -555,15 +490,11 @@ io.on('connection', (socket) => {
             let nextDrawer: UserI;
             let previousWords: number;
 
-            // checking if nextTurnInfo has data to set the next turn
             if (rooms[roomNumber].nextTurnInfo) {
-              // TypeScript doesnt infere that nextTurnInfo is an instance of NextTurnInfoI so have to
-              // set some fallback values
               nextRound = rooms[roomNumber].nextTurnInfo?.nextRound ?? 0;
               nextTurn = rooms[roomNumber].nextTurnInfo?.nextTurn ?? 1;
               nextDrawer = rooms[roomNumber].nextTurnInfo?.nextDrawer ?? rooms[roomNumber].users[0];
               previousWords = rooms[roomNumber].nextTurnInfo?.previousWords ?? 3;
-              // reset the property nextTurnInfo to undefined
               rooms[roomNumber].nextTurnInfo = undefined;
             } else {
               const {
@@ -591,7 +522,6 @@ io.on('connection', (socket) => {
             };
             rooms[roomNumber].gameState = newState;
             io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
-            // Checks if this was the last turn
             if (nextRound > (roomGameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
               rooms[roomNumber].gameState.endGame = true;
               io.to(roomNumber.toString()).emit('game ended', { owner: rooms[roomNumber].owner });
@@ -599,11 +529,9 @@ io.on('connection', (socket) => {
             }
             io.to(roomNumber.toString()).emit('show scoreboard');
           }
-          console.dir(rooms, { depth: null });
           return;
         }
       }
-      // This will send the event to all clients connected to the concrete room, including the one that initiated the event.
       const usersRoom = rooms[roomNumber].users;
       io.to(roomNumber.toString()).emit('chat msg', {
         user: users[socket.id].name,
@@ -617,7 +545,6 @@ io.on('connection', (socket) => {
   socket.on(
     'new segment',
     ({ lineLength, lineSegment, roomNumber }: { lineLength: number; lineSegment: LinesI; roomNumber: number }) => {
-      // This will send the event to all clients in the specified room, except for the one that initiated the event.
       socket.broadcast.to(roomNumber.toString()).emit('new segment', lineLength, lineSegment);
     }
   );
@@ -660,12 +587,9 @@ io.on('connection', (socket) => {
         room: roomNumber,
         roomUsers
       });
-      console.dir(rooms, { depth: null });
     }
   });
 
-  // TODO: check that the user is not already in the room (just in case)
-  // also check it on the 'join room directly' event
   socket.on('join room', ({ roomNumber, roomPassword }: { roomNumber: number; roomPassword: string }) => {
     if (!rooms[roomNumber]) {
       socket.emit('join room response', {
@@ -688,15 +612,12 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // join the socket to the room
     socket.join(roomNumber.toString());
 
     const username = users[socket.id].name;
-    // add the user to the room's users array
     const getRandomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: selectedRoom.users });
     const newUser: UserI = { id: socket.id, name: username, color: getRandomColor };
     selectedRoom.users.push(newUser);
-    // add the roomNumber to the room prop in users obj
     users[socket.id].room = roomNumber;
 
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
@@ -710,7 +631,6 @@ io.on('connection', (socket) => {
       });
     }
 
-    // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
     if (selectedRoom.gameState.totalScores) {
       selectedRoom.gameState.totalScores[socket.id] = {
         name: username,
@@ -718,14 +638,11 @@ io.on('connection', (socket) => {
       };
     }
 
-    // respond to the joining socket with success
     socket.emit('join room response', {
       success: true,
       message: `Bienvenido ${username} a la sala ${roomNumber}`,
       room: roomNumber,
-      // Sending the updated userList to the user just joined the room
       newUsers: selectedRoom.users,
-      // If preTurn true, it means that the game is not being played
       isPlaying: selectedRoom.gameState.preTurn !== undefined ? !selectedRoom.gameState.preTurn : false,
       gameState: selectedRoom.gameState
     });
@@ -737,8 +654,6 @@ io.on('connection', (socket) => {
       newUser,
       gameState: selectedRoom.gameState
     });
-
-    console.dir(rooms, { depth: null });
   });
 
   socket.on('await more players', ({ roomNumber }: { roomNumber: number }) => {
@@ -825,7 +740,6 @@ io.on('connection', (socket) => {
       gameState: newGameState
     });
 
-    // init preTurn countdown on front
     io.to(roomNumber.toString()).emit('countdown preDraw start');
     selectedRoom.usersNotPlaying = [];
   });
@@ -833,10 +747,8 @@ io.on('connection', (socket) => {
   socket.on('starting turn', ({ roomNumber }: { roomNumber: number }) => {
     const selectedRoom = rooms[roomNumber];
     const usersInRoom = Object.keys(selectedRoom.users).length;
-    // update the users playing this turn (drawer doesn't count)
     selectedRoom.gameState.usersGuessing = usersInRoom - 1;
 
-    // init turn countdown on front
     io.to(roomNumber.toString()).emit('countdown turn', { usersGuessing: usersInRoom - 1 });
   });
 
@@ -846,15 +758,11 @@ io.on('connection', (socket) => {
     let nextDrawer: UserI;
     let previousWords: number;
 
-    // checking if nextTurnInfo has data to set the next turn
     if (rooms[roomNumber].nextTurnInfo) {
-      // TypeScript doesnt infere that nextTurnInfo is an instance of NextTurnInfoI so have to
-      // set some fallback values
       nextRound = rooms[roomNumber].nextTurnInfo?.nextRound ?? 0;
       nextTurn = rooms[roomNumber].nextTurnInfo?.nextTurn ?? 1;
       nextDrawer = rooms[roomNumber].nextTurnInfo?.nextDrawer ?? rooms[roomNumber].users[0];
       previousWords = rooms[roomNumber].nextTurnInfo?.previousWords ?? 3;
-      // reset the property nextTurnInfo to undefined
       rooms[roomNumber].nextTurnInfo = undefined;
     } else {
       const {
@@ -882,7 +790,6 @@ io.on('connection', (socket) => {
     };
     rooms[roomNumber].gameState = newState;
     io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
-    // Checks if this was the last turn
     if (nextRound > (rooms[roomNumber].gameState.maxRounds ?? DEFAULT_MAX_ROUNDS)) {
       const owner = rooms[roomNumber].owner;
       rooms[roomNumber].gameState.endGame = true;
@@ -977,20 +884,16 @@ io.on('connection', (socket) => {
     });
   });
 
-  // TODO: Could refactor this logic with the 'join room' event logic
   socket.on('join room directly', ({ roomNumber, username }: { roomNumber: string; username: string }) => {
-    // add the user to the users array
     usersAmount++;
     users[socket.id] = { name: username, room: Number(roomNumber) };
     console.info(`${username} connected // Total users => ${usersAmount}`);
 
-    // join the socket to the room
     socket.join(roomNumber);
 
     const selectedRoom = rooms[roomNumber];
     const getRandomColor = getUniqueColor({ colorArray: USER_LIGHT_COLORS, usersArray: selectedRoom.users });
     const newUser: UserI = { id: socket.id, name: username, color: getRandomColor };
-    // add the user to the room's users array
     selectedRoom.users.push(newUser);
 
     if (selectedRoom.users.length >= 3 && !selectedRoom.gameState.started) {
@@ -1004,7 +907,6 @@ io.on('connection', (socket) => {
       });
     }
 
-    // Update the gameState.totalScores with the joined user assigning 0 points if proceeds
     if (selectedRoom.gameState.totalScores) {
       selectedRoom.gameState.totalScores[socket.id] = {
         name: username,
@@ -1012,12 +914,9 @@ io.on('connection', (socket) => {
       };
     }
 
-    // respond to the joining socket with success
     socket.emit('join room directly response', {
       success: true,
-      // Sending the updated userList to the user just joined the room
       newUsers: selectedRoom.users,
-      // If preTurn true, it means that the game is not being played
       isPlaying: selectedRoom.gameState.preTurn !== undefined ? !selectedRoom.gameState.preTurn : false,
       gameState: selectedRoom.gameState
     });
@@ -1029,8 +928,6 @@ io.on('connection', (socket) => {
       newUser,
       gameState: selectedRoom.gameState
     });
-
-    console.dir(rooms, { depth: null });
   });
 
   socket.on('update users not playing', ({ roomNumber }: { roomNumber: number | undefined }) => {
@@ -1044,7 +941,6 @@ io.on('connection', (socket) => {
     socket.to(roomNumber.toString()).emit('update lines state', { lines: draw });
   });
 
-  // No need to check if there are 3 users, since this event is triggered from the front when they're more than 2 users
   socket.on('send pre game', ({ roomNumber }: { roomNumber: number | undefined }) => {
     if (!roomNumber) return;
     const selectedRoom = rooms[roomNumber];
@@ -1086,7 +982,6 @@ io.on('connection', (socket) => {
       if (!roomNumber) return;
       const selectedRoom = rooms[roomNumber];
 
-      // When its 75% remaining, has 1 char or less crypted and the wordLength is >= 15, give 1 clue
       const { wordLength, revealedLettersCount } = checkCurrentWordStatus(selectedRoom.gameState.cryptedWord ?? '');
       const sendNewCryptedWord = (gameState: GameStateI) => {
         io.to(roomNumber.toString()).emit('update game state front', { gameState });
@@ -1114,11 +1009,6 @@ io.on('connection', (socket) => {
       }
     }
   );
-
-  // TODO: Create logic to modify in the config game, the max rounds to play
-  // TODO: Improve the words from the current categories and add some new categories
-  // TODO: Remove console logs for prod
-  // TODO: Remove getUnusedWord function since its not used ? Already using the shuffleArray helper
 });
 
 httpServer.listen(PORT, () => console.info(`Server running and listening at http://localhost:${PORT}`));

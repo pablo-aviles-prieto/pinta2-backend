@@ -16,22 +16,20 @@ export interface GameStateI {
   category?: string;
   currentWord?: string;
   cryptedWord?: string;
-  words?: string[]; // already shuffled
-  previousWords?: number; // number of used words in the game (next turn can get the words starting with the index of this number)
+  words?: string[];
+  previousWords?: number;
   drawer?: UserI;
-  round?: number; // the current round number (initialize in 1)
-  maxRounds?: number; // establish the last round number to be played (default as 2)
-  turn?: number; // the current drawing turn (initialize in 0)
+  round?: number;
+  maxRounds?: number;
+  turn?: number;
   preTurn?: boolean;
-  turnDuration?: number; // number in ms
-  usersGuessing?: number; // tracks how many users are playing the round (in case user joins in the middle of a round)
-  endGame?: boolean; // tracks if the game is finished
+  turnDuration?: number;
+  usersGuessing?: number;
+  endGame?: boolean;
   totalScores?: {
-    // storing as key the socket.id of the users
     [key: string]: { name: string; value: number };
   };
   turnScores?: {
-    // storing as key the socket.id of the users
     [key: string]: { name: string; value: number };
   };
 }
@@ -42,5 +40,5 @@ export interface RoomsI {
   users: UserI[];
   gameState: GameStateI;
   nextTurnInfo: NextTurnInfoI | undefined;
-  usersNotPlaying: string[]; // storing the users.id that joined while turn in progress
+  usersNotPlaying: string[];
 }

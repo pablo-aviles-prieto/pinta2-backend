@@ -25,8 +25,6 @@ export const handleRemoveUser = ({ users, socket, username, usersAmount }: Remov
   console.info(`${username} disconnected // Total users => ${usersAmount}`);
 };
 
-// Removes the user from the room, send the update event. If is owner it passes to 1st user
-// last, removes the user from the userList and display console info
 export const handleRemoveUserOnRoom = ({
   users,
   socket,

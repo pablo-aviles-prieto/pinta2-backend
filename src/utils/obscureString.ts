@@ -2,7 +2,6 @@ export const obscureString = (str: string) => {
   const array = [...str];
   const nonSpaceIndices: number[] = [];
 
-  // Replacing non-space characters with asterisks and tracking their indices
   for (let i = 0; i < array.length; i++) {
     if (array[i] !== ' ') {
       array[i] = '*';
