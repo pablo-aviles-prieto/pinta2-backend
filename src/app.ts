@@ -49,7 +49,8 @@ if (!FRONT_ADDRESS || !FRONT_ADDRESS2) {
 const io = new Server(httpServer, {
   cors: {
     origin: [FRONT_ADDRESS, FRONT_ADDRESS2]
-  }
+  },
+  transports: ['websocket', 'polling']
 });
 
 let usersAmount = 0;
