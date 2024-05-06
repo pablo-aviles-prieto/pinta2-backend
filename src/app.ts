@@ -438,7 +438,7 @@ io.on('connection', (socket) => {
         io,
         isOwner
       });
-      console.dir(rooms, { depth: null });
+      // console.dir(rooms, { depth: null });
       return;
     }
 
@@ -600,7 +600,7 @@ io.on('connection', (socket) => {
             }
             io.to(roomNumber.toString()).emit('show scoreboard');
           }
-          console.dir(rooms, { depth: null });
+          // console.dir(rooms, { depth: null });
           return;
         }
       }
@@ -661,7 +661,7 @@ io.on('connection', (socket) => {
         room: roomNumber,
         roomUsers
       });
-      console.dir(rooms, { depth: null });
+      // console.dir(rooms, { depth: null });
     }
   });
 
@@ -1031,7 +1031,7 @@ io.on('connection', (socket) => {
       gameState: selectedRoom.gameState
     });
 
-    console.dir(rooms, { depth: null });
+    // console.dir(rooms, { depth: null });
   });
 
   socket.on('update users not playing', ({ roomNumber }: { roomNumber: number | undefined }) => {
