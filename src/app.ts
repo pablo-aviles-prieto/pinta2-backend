@@ -267,7 +267,7 @@ io.on('connection', (socket) => {
         io.to(roomNumber.toString()).emit('update game state front', { gameState: newState });
       }
 
-      const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id ?? '');
+      const drawerIndex = selectedRoom.users.findIndex((user) => user.id === roomGameState.drawer?.id);
 
       // If its in preTurn, it just remove the user, and handle edge cases on drawer
       if (selectedRoom.gameState.preTurn) {
